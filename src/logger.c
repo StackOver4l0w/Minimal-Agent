@@ -1,38 +1,38 @@
 #include "logger.h"
 #include "types.h"
-#include "string.h"
+
+#ifdef LOGGING_ENABLED
+
 #include "kernel32.h"
+#include "memory.h"
 
 #define STD_OUTPUT_HANDLE  ((DWORD)-11)
 
-INT32 PRINT_FORMATTED_STRING(PCHAR format, ...)
+/**
+ * Write a string buffer directly to stdout
+ * Avoids format strings - keeps everything on stack
+ * @param buffer: Pointer to string data (on stack from STACK_STR macro)
+ * @param len: Number of bytes to write (from sizeof() - 1 to exclude null terminator)
+ */
+void log_write(const char* buffer, unsigned long len)
 {
-
-    CHAR buffer[1024];
-    va_list args;
-
-    va_start(args, format);
-    INT32 len = FormatV(buffer, format, args);
-    va_end(args);
-
-    if (len < 0)
-        return -1;
-
-    KERNEL32 kernel;
-
+    if (buffer == NULL || len == 0)
+        return;
+    KERNEL32 kernel = {0};
+    //KERNEL32_Ctor(&kernel);
+    
     if (!KERNEL32_Ctor(&kernel))
-        return -1;
+        return;
 
     HANDLE stdout_handle = kernel.GetStdHandle(STD_OUTPUT_HANDLE);
-
-    if (!stdout_handle)
-        return -1;
+    if (!stdout_handle || stdout_handle == (HANDLE)-1)
+        return;
 
     DWORD written = 0;
-
-    if (!kernel.WriteFile(stdout_handle, buffer, (DWORD)len, &written, NULL)){
-        return -1;
-    }
-
-    return (INT32)written;
+    /* Write to stdout - errors are silent in logging */
+    kernel.WriteFile(stdout_handle, (void*)buffer, (DWORD)len, &written, NULL);
 }
+
+#endif /* LOGGING_ENABLED */
+
+
