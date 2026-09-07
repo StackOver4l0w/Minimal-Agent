@@ -68,8 +68,8 @@ jobs:
           # entry.c MUST stay FIRST on the command line and carries only
           # entry() (the stack probes live in src/stack_probes.c). Merge
           # read-only log/string data into .text so the extracted blob
-          # contains every RIP-relative target it uses. llvm-mingw uses lld,
-          # whose PE linker accepts /merge rather than GNU ld's -T.
+          # contains every RIP-relative target it uses. Select an explicit
+          # architecture-specific GNU ld-compatible linker script below.
             rm -rf obj
             mkdir -p obj
             ${{ matrix.triple }}-gcc -O2 -Iinclude -Wall -Wextra \
@@ -87,10 +87,14 @@ jobs:
             for object in obj/*.o; do
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
+            case "${{ matrix.arch }}" in
+              i386) linker_script=linker-i386.ld ;;
+              x86_64) linker_script=linker.ld ;;
+            esac
             ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude -Wall -Wextra \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -e entry \
-              -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
+                -T "$linker_script" \
               -o minimal_agent.exe "${objects[@]}"
           ${{ matrix.triple }}-objcopy --dump-section .text=minimal_agent.bin minimal_agent.exe
 

@@ -8,17 +8,15 @@ SECTIONS
     {
         KEEP(*entry.o(.text))
         *(.text)
-        *(.text.*)
-        *(.rdata)
-        *(.rdata.*)
+        *(.text*)
+        *(.rdata*)
+        *(.rodata*)
     }
 
     /DISCARD/ :
     {
-        *(.data)
-        *(.data.*)
-        *(.bss)
-        *(.bss.*)
+        *(.data*)
+        *(.bss*)
         *(COMMON)
         *(.comment)
     }
