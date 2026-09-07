@@ -22,7 +22,7 @@ void log_write(const char* buffer, unsigned long len);
  */
 #define LOG_INFO(literal) \
     do { \
-        STACK_STR(__log_msg, "[INF] " literal "\n"); \
+        STACK_STR(__log_msg, literal "\n"); \
         log_write(__log_msg, sizeof(__log_msg) - 1); \
     } while(0)
 
@@ -34,7 +34,7 @@ void log_write(const char* buffer, unsigned long len);
  */
 #define LOG_ERROR(literal) \
     do { \
-        STACK_STR(__log_err, "[ERR] " literal "\n"); \
+        STACK_STR(__log_err, literal "\n"); \
         log_write(__log_err, sizeof(__log_err) - 1); \
     } while(0)
 

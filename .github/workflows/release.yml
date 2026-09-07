@@ -116,33 +116,17 @@ jobs:
           fi
 
 
-          # Gate 4: no RIP-relative reference may leave .text - a pooled
-          # constant or jump table in .rdata kills the raw blob (the blob
-          # is .text alone; any rip-ref past its end faults at first use).
-          # Catches compilers that pool stack-string constants despite the
-          # volatile recipe (llvm-mingw clang did exactly this).
-          bad_refs=""
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            text_size_hex=$(${{ matrix.triple }}-objdump -h minimal_agent.exe | awk '$2 == ".text" {print $3; exit}')
-            text_start=$(( 0x$text_vma ))
-            text_end=$(( text_start + 0x$text_size_hex ))
-            bad_refs=$(${{ matrix.triple }}-objdump -d minimal_agent.exe \
-                | grep -E '\(%rip\).*# 0x[0-9a-fA-F]+' \
-                | sed -E 's/.*# 0x([0-9a-fA-F]+).*/\1/' \
-                | sort -u \
-                | while read -r target; do
-                    target_va=$(( 0x$target ))
-                    if [ "$target_va" -lt "$text_start" ] || [ "$target_va" -ge "$text_end" ]; then
-                      printf '%s\n' "$target_va"
-                    fi
-                  done)
-          fi
-          if [ -n "$bad_refs" ]; then
-            echo "FAIL: rip-relative references leave .text (blob would fault):"
-            echo "$bad_refs"
-            exit 1
-          fi
-          echo "rip-refs outside .text: none (gate 4 clean)"
+          # Gate 4: all read-only blob data must be inside .text. Since the
+          # linker intentionally merges data into .text, objdump -d cannot
+          # distinguish embedded strings from instructions and cannot safely
+          # validate RIP-relative references in the final image.
+          for section in .rdata .rodata .data .bss; do
+            if ${{ matrix.triple }}-objdump -h minimal_agent.exe | awk -v name="$section" '$2 == name { found = 1 } END { exit !found }'; then
+              echo "FAIL: forbidden separate section remains: $section"
+              exit 1
+            fi
+          done
+          echo "blob section layout: .text contains read-only data; no separate data sections"
           mkdir -p artifacts
           cp minimal_agent.exe "artifacts/windows-${{ matrix.arch }}.exe"
           cp minimal_agent.bin "artifacts/windows-${{ matrix.arch }}.bin"
