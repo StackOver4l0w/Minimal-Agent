@@ -74,7 +74,7 @@ jobs:
             mkdir -p obj
             ${{ matrix.triple }}-gcc -O2 -Iinclude -Wall -Wextra \
               -DLOGGING_ENABLED \
-              -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
+              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
               -c \
@@ -90,7 +90,7 @@ jobs:
             done
             ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude -Wall -Wextra \
               -DLOGGING_ENABLED \
-              -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
+              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -e entry \
               -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
               -o minimal_agent.exe "${objects[@]}"
