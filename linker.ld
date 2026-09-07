@@ -10,14 +10,18 @@ SECTIONS
     .text : {
         KEEP(*entry.o(.text))
         *(.text)
-        *(.text*)
-        *(.rdata*)
-        *(.rodata*)
+        *(.text.*)
+        *(.rdata)
+        *(.rdata.*)
+        *(.rodata)
+        *(.rodata.*)
     }
 
     /DISCARD/ : {
-        *(.data*)
-        *(.bss*)
+        *(.data)
+        *(.data.*)
+        *(.bss)
+        *(.bss.*)
         *(COMMON)
         *(.comment)
     }
