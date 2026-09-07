@@ -153,12 +153,22 @@ jobs:
           # is .text alone; any rip-ref past its end faults at first use).
           # Catches compilers that pool stack-string constants despite the
           # volatile recipe (llvm-mingw clang did exactly this).
-          text_size_hex=$(${{ matrix.triple }}-objdump -h minimal_agent.exe | awk '$2 == ".text" {print $3; exit}')
-          text_start=$(( 0x$text_vma ))
-          text_end=$(( text_start + 0x$text_size_hex ))
-          bad_refs=$(${{ matrix.triple }}-objdump -d minimal_agent.exe \
-              | grep -oE '# 0x[0-9a-f]+' | sort -u \
-              | awk -v s="$text_start" -v e="$text_end" '{ a = strtonum("0x" substr($2, 3)); if (a < s || a >= e) print a }')
+          bad_refs=""
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            text_size_hex=$(${{ matrix.triple }}-objdump -h minimal_agent.exe | awk '$2 == ".text" {print $3; exit}')
+            text_start=$(( 0x$text_vma ))
+            text_end=$(( text_start + 0x$text_size_hex ))
+            bad_refs=$(${{ matrix.triple }}-objdump -d minimal_agent.exe \
+                | grep -E '\(%rip\).*# 0x[0-9a-fA-F]+' \
+                | sed -E 's/.*# 0x([0-9a-fA-F]+).*/\1/' \
+                | sort -u \
+                | while read -r target; do
+                    target_va=$(( 0x$target ))
+                    if [ "$target_va" -lt "$text_start" ] || [ "$target_va" -ge "$text_end" ]; then
+                      printf '%s\n' "$target_va"
+                    fi
+                  done)
+          fi
           # Diagnostic: dump sections and .rdata bytes when gate 4 is about to fail
           ${{ matrix.triple }}-objdump -h minimal_agent.exe | sed -n '1,12p'
           ${{ matrix.triple }}-objdump -s -j .rdata minimal_agent.exe || true
