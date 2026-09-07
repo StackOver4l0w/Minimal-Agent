@@ -95,7 +95,6 @@ jobs:
             rm -rf obj
             mkdir -p obj
             ${{ matrix.triple }}-gcc -O2 -Iinclude \
-              -DLOGGING_ENABLED \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
@@ -111,7 +110,6 @@ jobs:
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
             ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude \
-              -DLOGGING_ENABLED \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -e entry \
               -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
