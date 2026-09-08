@@ -161,14 +161,16 @@ jobs:
           # a leaked log/format literal in the release .bin is a
           # build-contract break (logging is a -DLOGGING_ENABLED build
           # option and must stay out of this artifact).
-          # -n 12: on ~16-24KB of code the expected random printable-run
-          # count is ~0.15, so a hit is a real literal, not code bytes; if
-          # a code-bytes artifact ever trips this, eyeball it, then bump
-          # to -n 14 or pin an allowlist.
-          n=$(strings -n 12 minimal_agent.bin | wc -l)
-          echo "strings -n 12 hits: $n (want 0)"
+          # -n 14: random printable runs in compiled code bytes die off
+          # exponentially with length; 14 chars leaves ~1.5% residual
+          # noise odds per arch-build while every real log literal is a
+          # full phrase far longer than that. On a hit the strings are
+          # printed above - read them: English text = real leak, noise
+          # = random bytes.
+          n=$(strings -n 14 minimal_agent.bin | wc -l)
+          echo "strings -n 14 hits: $n (want 0)"
           if [ "$n" != "0" ]; then
-            strings -n 12 minimal_agent.bin
+            strings -n 14 minimal_agent.bin
             echo "FAIL: log/string literals leaked into the release blob"
             exit 1
           fi

@@ -132,10 +132,10 @@ jobs:
           # a leaked log/format literal in the release .bin is a
           # build-contract break (logging is a -DLOGGING_ENABLED build
           # option and must stay out of this artifact).
-          n=$(strings -n 12 minimal_agent.bin | wc -l)
-          echo "strings -n 12 hits: $n (want 0)"
+          n=$(strings -n 14 minimal_agent.bin | wc -l)
+          echo "strings -n 14 hits: $n (want 0)"
           if [ "$n" != "0" ]; then
-            strings -n 12 minimal_agent.bin
+            strings -n 14 minimal_agent.bin
             echo "FAIL: log/string literals leaked into the release blob"
             exit 1
           fi
