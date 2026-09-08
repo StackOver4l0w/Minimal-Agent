@@ -108,11 +108,13 @@ src/
   peb.c                    GetCurrentPEB (1 asm instr/arch), module-list walk.
   system.c                 PE export resolve by hash / by name; fwd-refusal.
   djb2.c                   lowercase djb2, 64-bit, seed 5381.
-  string.c                 strlen/wcslen/strcmp/Format (the printf subset
-                           actually used), number formatting.
+  string.c                 strlen/wcslen/AnsiToWide (wide conversion and
+                           lengths; no formatting).
+  logfmt.c                 the printf formatter (bounded Format/FormatV) —
+                           compiled empty in release, the LOG_* engine in dev.
   memory.c                 MemoryZero/MemoryCopy + freestanding memset.
-  logger.c                 PRINT_FORMATTED_STRING → WriteFile(stdout);
-                           LOG_* macros compile to nothing in release.
+  logger.c                 LOG_INFO/LOG_ERROR printf macros → Format →
+                           WriteFile(stdout); compiles to nothing in release.
 include/
   types.h                  the whole type dictionary + arch normalization.
   wintypes.h               Windows-ish structs (UNICODE_STRING, OSVERSIONINFOW,

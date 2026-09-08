@@ -154,5 +154,5 @@ agent touched built on a stack frame that has already vanished.
 ## Next
 
 The build: how all of this becomes one `.text` section, what each flag
-prevents, and the four gates that keep it honest —
+prevents, and the gates that keep it honest —
 [08 - Build, Gates, and CI](08-build-and-ci.md).

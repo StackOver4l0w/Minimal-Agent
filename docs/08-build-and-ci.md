@@ -51,10 +51,10 @@ literals (they ARE `.rdata`).
 
 ---
 
-## 2. The Four Gates
+## 2. The Gates
 
-A green build must mean a working agent. Four checks run after every
-link — locally via `.local-tests/build.sh`, in CI after every build:
+A green build must mean a working agent. The checks that run after
+every release-flavor link in CI:
 
 **Gate 1 — imports empty.** `objdump -p | grep 'DLL Name:'` must print
 nothing. One line means something pulled a library back in and the
@@ -93,12 +93,14 @@ rather than what sections exist.
 Same commands plus `-DLOGGING_ENABLED` on **both** the compile and the
 link (miss one and you get a silent hybrid), a cleaned `obj\` (mixing
 release and dev objects produces a broken hybrid too), and a distinct
-output name. The dev binary carries log format strings in its
-`.rdata` — legitimate for an exe, which is why the blob is always cut
-from the release build.
+output name. The dev binary carries its printf log literals inside
+`.text` (the linker folds `.rdata` in), so its blob cuts and loads
+exactly like the release one — the literals live in-blob, and the
+literal gate (§4) exempts the dev flavor by design.
 
-The logger itself is minimal: `PRINT_FORMATTED_STRING` formats into a
-stack buffer via the hand-rolled `FormatV` and `WriteFile`s it to
+The logger is printf-style: `LOG_INFO("Shell %d opened", id)` formats
+into a 256-byte stack buffer via the bounded `Format`/`FormatV` in
+`src/logfmt.c` (compiled empty in release) and `WriteFile`s it to
 stdout. In release, `LOG_*` macros expand to nothing and the whole
 call sites vanish.
 
@@ -120,12 +122,17 @@ call sites vanish.
   count>` and `-DAGENT_COMMIT_HASH=<short sha>` ride the identity
   headers (chapter 05), so the panel shows exactly which build it is
   driving.
-- **All four gates run in-matrix** — a pooled constant on aarch64
-  fails that job, not the release.
+- **All five gates run in-matrix** — a pooled constant on aarch64
+  fails that job, not the release. Gate 5 (the literal scan) greps the
+  `.bin` for literal-shaped strings — lowercase words with spaces —
+  because raw printable runs false-positive on x86_64 clang register-
+  push prologues (`AWAVAUATVWUSPH…` is pure printable ASCII).
 
-`release.yml` (on `v*` tags) runs the same gated build and attaches
-`windows-{i386,x86_64,aarch64}.{exe,bin}` to a GitHub Release. The
-`.bin` assets are cut with `--dump-section` — byte 0 is `entry()`,
+`release.yml` (on `v*` tags) runs the same gated build plus a dev
+flavor (x86_64, `-DLOGGING_ENABLED`, exempt from the literal gate) and
+attaches `windows-{i386,x86_64,aarch64}.{exe,bin}` and
+`windows-x86_64-dev.{exe,bin}` to a GitHub Release. The `.bin` assets
+are cut with `--dump-section` — byte 0 is `entry()`,
 load-and-jump ready.
 
 On pushes to `main`, build.yml additionally republishes the rolling
@@ -150,21 +157,16 @@ record, for those who think a gate is overkill:
 The pattern to internalize: **the exe works in every one of these
 cases.** The exe has `.rdata` sitting right next to `.text`; the
 addresses are valid. Only the blob — `.text` alone, loaded anywhere —
-dies. Testing the exe proves nothing about the blob; testing the blob
-is what the harness (`.local-tests/blob_loader.exe`) and gate 4 are
-for.
+dies. Testing the exe proves nothing about the blob; the gates exist
+to keep the blob contract true.
 
 ---
 
-## 6. Local Build Harness
+## 6. Local Build
 
-`sh .local-tests/build.sh` — the one-command local build: compiles all
-sources with the full flag set, links with `entry.o` first, runs the
-import/entry gates, cuts the textonly variant for the section
-scoreboard, and prints the blob entry offset. The oracle
-(`.local-tests/hash_resolve_oracle.c`) separately verifies every
-`apihash.h` constant and every stack-string builder against the live
-PEB — the falsifier for chapters 03 and 04.
+The README recipes are the canonical local build: compile all sources
+with the full flag set, link with `entry.o` first, cut the blob, run
+the gates by hand exactly as CI does.
 
 ---
 

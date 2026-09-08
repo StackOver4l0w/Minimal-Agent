@@ -152,11 +152,11 @@ understand them, every oddity in the code stops being odd:
 |---|---|---|
 | `entry.c` | 34 | `entry()` — PEB env read → `agent_main` → `ExitProcess`. Link-order head |
 | `src/stack_probes.c` | 63 | `__chkstk`/`__alloca` asm (x86_64 / i386 / aarch64) |
-| `src/main.c` | 395 | dial/serve/redial loop; v3 command handlers |
+| `src/main.c` | 396 | dial/serve/redial loop; v3 command handlers |
 | `src/identity_headers.c` | 129 | the X-Agent-* identity block |
 | `src/transport.c` | 51 | `ws_send` / `ws_receive` (fragment assembly) |
 | `src/shell.c` | 143 | the cmd.exe pool |
-| `src/report.c` | 180 | dev-only command printing (names are stack strings) |
+| `src/report.c` | 44 | dev-only command printing (names are stack strings) |
 | `src/system_facts.c` | 57 | hostname / username / OS version |
 | `src/environment.c` | 73 | `GetVariable` — walk the PEB environment block |
 | `src/winhttp_api.c` | 88 | LdrLoadDll(winhttp.dll) + table resolve |
@@ -166,9 +166,10 @@ understand them, every oddity in the code stops being odd:
 | `src/peb.c` | 46 | TEB→PEB access, module-list walk |
 | `src/system.c` | 170 | PE export resolve by hash and by name |
 | `src/djb2.c` | 14 | the hash both resolve paths share |
-| `src/string.c` | 461 | hand-rolled strlen/wcslen/Format/number formatting |
+| `src/string.c` | 32 | strlen / wcslen / AnsiToWide (no formatting) |
+| `src/logfmt.c` | 442 | the bounded printf formatter — dev-only, empty TU in release |
 | `src/memory.c` | 26 | MemoryZero / MemoryCopy / freestanding memset |
-| `src/logger.c` | 38 | `PRINT_FORMATTED_STRING` → WriteFile(stdout) |
+| `src/logger.c` | 38 | printf `LOG_INFO`/`LOG_ERROR` macros → WriteFile(stdout) |
 | `include/stackstrings.h` | 964 | the string dictionary (XOR builders) |
 | `include/apihash.h` | 42 | precomputed djb2 constants for every name used |
 | `include/protocol.h` | 46 | opcodes, statuses, limits, exit codes |
