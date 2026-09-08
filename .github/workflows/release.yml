@@ -19,9 +19,13 @@ jobs:
       matrix:
         include:
           # The three Windows arches the C2 Agents table tags (X86/AMD64/ARM64)
-          - { arch: i386,    triple: i686-w64-mingw32 }
-          - { arch: x86_64,  triple: x86_64-w64-mingw32 }
-          - { arch: aarch64, triple: aarch64-w64-mingw32 }
+          - { arch: i386,    triple: i686-w64-mingw32,    flavor: release }
+          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: release }
+          - { arch: aarch64, triple: aarch64-w64-mingw32, flavor: release }
+          # Dev flavor: printf-logging agent for debugging (one arch).
+          # Its .bin carries the log literals inside .text and is exempt
+          # from the literal gate - the strings ARE its feature.
+          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: dev }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -64,15 +68,25 @@ jobs:
         run: |
           BUILD_NUMBER=$(git rev-list --count HEAD)
           COMMIT_HASH=$(git rev-parse --short=8 HEAD)
-          echo "=== building windows-${{ matrix.arch }} (${{ matrix.triple }}-gcc) ==="
+          DEFS=""
+          EXE=minimal_agent.exe
+          BIN=minimal_agent.bin
+          if [ "${{ matrix.flavor }}" = "dev" ]; then
+            DEFS="-DLOGGING_ENABLED"
+            EXE=minimal_agent_dev.exe
+            BIN=minimal_agent_dev.bin
+          fi
+          echo "=== building windows-${{ matrix.arch }}-${{ matrix.flavor }} (${{ matrix.triple }}-gcc) ==="
           # entry.c MUST stay FIRST on the command line and carries only
           # entry() (the stack probes live in src/stack_probes.c). Merge
           # read-only log/string data into .text so the extracted blob
           # contains every RIP-relative target it uses. llvm-mingw uses lld,
           # whose PE linker accepts /merge rather than GNU ld's -T.
+          # The dev flavor adds -DLOGGING_ENABLED on BOTH lines: the printf
+          # log macros and the whole logfmt.c formatter compile in.
             rm -rf obj
             mkdir -p obj
-            ${{ matrix.triple }}-gcc -O2 -Iinclude -Wall -Wextra \
+            ${{ matrix.triple }}-gcc -O2 -Iinclude $DEFS -Wall -Wextra \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
@@ -87,20 +101,20 @@ jobs:
             for object in obj/*.o; do
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
-            ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude -Wall -Wextra \
+            ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude $DEFS -Wall -Wextra \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
               -e entry \
               -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
-              -o minimal_agent.exe "${objects[@]}"
-          ${{ matrix.triple }}-objcopy --dump-section .text=minimal_agent.bin minimal_agent.exe
+              -o "$EXE" "${objects[@]}"
+          ${{ matrix.triple }}-objcopy --dump-section .text="$BIN" "$EXE"
 
-          imp=$(${{ matrix.triple }}-objdump -p minimal_agent.exe | grep -c 'DLL Name' || true)
+          imp=$(${{ matrix.triple }}-objdump -p "$EXE" | grep -c 'DLL Name' || true)
           echo "imports: $imp (want 0)"
           [ "$imp" = "0" ] || { echo "FAIL: import table not empty"; exit 1; }
 
-          image_base=$(${{ matrix.triple }}-objdump -p minimal_agent.exe | sed -n 's/^[[:space:]]*ImageBase[[:space:]:]*//p' | awk '{print $1; exit}' | sed 's/^0x//')
-          entry_rva=$(${{ matrix.triple }}-objdump -p minimal_agent.exe | sed -n 's/^[[:space:]]*AddressOfEntryPoint[[:space:]:]*//p' | awk '{print $1; exit}' | sed 's/^0x//')
-          text_vma=$(${{ matrix.triple }}-objdump -h minimal_agent.exe | awk '$2 == ".text" {print $4; exit}' | sed 's/^0x//')
+          image_base=$(${{ matrix.triple }}-objdump -p "$EXE" | sed -n 's/^[[:space:]]*ImageBase[[:space:]:]*//p' | awk '{print $1; exit}' | sed 's/^0x//')
+          entry_rva=$(${{ matrix.triple }}-objdump -p "$EXE" | sed -n 's/^[[:space:]]*AddressOfEntryPoint[[:space:]:]*//p' | awk '{print $1; exit}' | sed 's/^0x//')
+          text_vma=$(${{ matrix.triple }}-objdump -h "$EXE" | awk '$2 == ".text" {print $4; exit}' | sed 's/^0x//')
           test -n "$image_base" || { echo "FAIL: could not read PE image base"; exit 1; }
           test -n "$entry_rva" || { echo "FAIL: could not read PE entry RVA"; exit 1; }
           test -n "$text_vma" || { echo "FAIL: could not read .text VMA"; exit 1; }
@@ -109,8 +123,8 @@ jobs:
           echo "entry offset in .text: $entry_off (want 0)"
           [ "$entry_off" = "0" ] || { echo "FAIL: entry() is not at .text byte 0"; exit 1; }
 
-          head -c 2 minimal_agent.bin | od -c | head -1
-          if [ "$(head -c 2 minimal_agent.bin)" = "MZ" ]; then
+          head -c 2 "$BIN" | od -c | head -1
+          if [ "$(head -c 2 "$BIN")" = "MZ" ]; then
             echo "FAIL: .bin starts with the PE header - objcopy copied the image"
             exit 1
           fi
@@ -121,35 +135,43 @@ jobs:
           # distinguish embedded strings from instructions and cannot safely
           # validate RIP-relative references in the final image.
           for section in .rdata .rodata .data .bss; do
-            if ${{ matrix.triple }}-objdump -h minimal_agent.exe | awk -v name="$section" '$2 == name { found = 1 } END { exit !found }'; then
+            if ${{ matrix.triple }}-objdump -h "$EXE" | awk -v name="$section" '$2 == name { found = 1 } END { exit !found }'; then
               echo "FAIL: forbidden separate section remains: $section"
               exit 1
             fi
           done
           echo "blob section layout: .text contains read-only data; no separate data sections"
 
-          # Gate 5: the silent blob must contain NO leaked literals. A
-          # naive strings scan false-positives on x86_64 clang codegen -
-          # the register-push prologue sequences (AWAVAUATVWUSPH...) are
-          # all printable ASCII. A leaked literal, however, is an English
+          # Gate 5 (release only): the silent blob must contain NO leaked
+          # literals. A naive strings scan false-positives on x86_64 clang
+          # codegen - the register-push prologue sequences (AWAVAUATVWUSPH...)
+          # are all printable ASCII. A leaked literal, however, is an English
           # phrase: lowercase words with spaces between them. Scan for
-          # that shape, not for raw printable runs.
-          n=$(strings -n 14 minimal_agent.bin | grep -cE '[a-z]+ [a-z]+' || true)
-          echo "literal-shaped hits: $n (want 0)"
-          if [ "$n" != "0" ]; then
-            strings -n 14 minimal_agent.bin | grep -E '[a-z]+ [a-z]+'
-            echo "FAIL: log/string literals leaked into the release blob"
-            exit 1
+          # that shape, not for raw printable runs. The dev flavor is
+          # exempt: its log literals are the feature.
+          if [ "${{ matrix.flavor }}" = "release" ]; then
+            n=$(strings -n 14 "$BIN" | grep -cE '[a-z]+ [a-z]+' || true)
+            echo "literal-shaped hits: $n (want 0)"
+            if [ "$n" != "0" ]; then
+              strings -n 14 "$BIN" | grep -E '[a-z]+ [a-z]+'
+              echo "FAIL: log/string literals leaked into the release blob"
+              exit 1
+            fi
           fi
           mkdir -p artifacts
-          cp minimal_agent.exe "artifacts/windows-${{ matrix.arch }}.exe"
-          cp minimal_agent.bin "artifacts/windows-${{ matrix.arch }}.bin"
+          if [ "${{ matrix.flavor }}" = "dev" ]; then
+            cp "$EXE" "artifacts/windows-${{ matrix.arch }}-dev.exe"
+            cp "$BIN" "artifacts/windows-${{ matrix.arch }}-dev.bin"
+          else
+            cp "$EXE" "artifacts/windows-${{ matrix.arch }}.exe"
+            cp "$BIN" "artifacts/windows-${{ matrix.arch }}.bin"
+          fi
           ls -la artifacts/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-windows-${{ matrix.arch }}
+          name: release-windows-${{ matrix.arch }}-${{ matrix.flavor }}
           retention-days: 1
           path: artifacts/
 
