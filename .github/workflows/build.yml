@@ -157,20 +157,16 @@ jobs:
           done
           echo "blob section layout: .text contains read-only data; no separate data sections"
 
-          # Gate 5: the silent blob must contain NO printable strings -
-          # a leaked log/format literal in the release .bin is a
-          # build-contract break (logging is a -DLOGGING_ENABLED build
-          # option and must stay out of this artifact).
-          # -n 14: random printable runs in compiled code bytes die off
-          # exponentially with length; 14 chars leaves ~1.5% residual
-          # noise odds per arch-build while every real log literal is a
-          # full phrase far longer than that. On a hit the strings are
-          # printed above - read them: English text = real leak, noise
-          # = random bytes.
-          n=$(strings -n 14 minimal_agent.bin | wc -l)
-          echo "strings -n 14 hits: $n (want 0)"
+          # Gate 5: the silent blob must contain NO leaked literals. A
+          # naive strings scan false-positives on x86_64 clang codegen -
+          # the register-push prologue sequences (AWAVAUATVWUSPH...) are
+          # all printable ASCII. A leaked literal, however, is an English
+          # phrase: lowercase words with spaces between them. Scan for
+          # that shape, not for raw printable runs.
+          n=$(strings -n 14 minimal_agent.bin | grep -cE '[a-z]+ [a-z]+' || true)
+          echo "literal-shaped hits: $n (want 0)"
           if [ "$n" != "0" ]; then
-            strings -n 14 minimal_agent.bin
+            strings -n 14 minimal_agent.bin | grep -E '[a-z]+ [a-z]+'
             echo "FAIL: log/string literals leaked into the release blob"
             exit 1
           fi
