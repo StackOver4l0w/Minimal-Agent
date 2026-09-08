@@ -1,6 +1,39 @@
 #include "entry.h"
 
-#if defined(ENVIRONMENT_x86_64) || defined(__x86_64__) || defined(_M_X64)
+#if defined(ENVIRONMENT_I386) || defined(__i386__) || defined(_M_IX86)
+asm(
+    ".text\n"
+    ".globl ___chkstk_ms\n"
+    ".globl __chkstk_ms\n"
+    ".globl __chkstk\n"
+    ".globl _chkstk\n"
+    ".globl ___alloca\n"
+    ".globl __alloca\n"
+    "___chkstk_ms:\n"
+    "__chkstk_ms:\n"
+    "__chkstk:\n"
+    "_chkstk:\n"
+    "___alloca:\n"
+    "__alloca:\n"
+    "    pushl %ecx\n"
+    "    pushl %eax\n"
+    "    leal  0x0c(%esp), %ecx\n"
+    "    cmpl  $0x1000, %eax\n"
+    "    jb    2f\n"
+    "1:\n"
+    "    subl  $0x1000, %ecx\n"
+    "    orl   $0, (%ecx)\n"
+    "    subl  $0x1000, %eax\n"
+    "    cmpl  $0x1000, %eax\n"
+    "    jae   1b\n"
+    "2:\n"
+    "    subl  %eax, %ecx\n"
+    "    orl   $0, (%ecx)\n"
+    "    popl  %eax\n"
+    "    popl  %ecx\n"
+    "    ret\n"
+);
+#elif defined(ENVIRONMENT_x86_64) || defined(__x86_64__) || defined(_M_X64)
 asm(
     ".globl __chkstk\n"
     ".globl ___chkstk_ms\n"
@@ -22,29 +55,6 @@ asm(
     "   orq   $0, (%rcx)\n"
     "   popq  %rax\n"
     "   popq  %rcx\n"
-    "   ret\n"
-);
-#elif defined(ENVIRONMENT_I386) || defined(__i386__) || defined(_M_IX86)
-
-asm(
-    ".globl __alloca\n"
-    "__alloca:\n"
-    "   pushl %ecx\n"
-    "   pushl %eax\n"
-    "   leal 0x0c(%esp), %ecx\n"
-    "   cmpl $0x1000, %eax\n"
-    "   jb 2f\n"
-    "1:\n"
-    "   subl $0x1000, %ecx\n"
-    "   orl $0, (%ecx)\n"
-    "   subl $0x1000, %eax\n"
-    "   cmpl $0x1000, %eax\n"
-    "   ja 1b\n"
-    "2:\n"
-    "   subl %eax, %ecx\n"
-    "   orl $0, (%ecx)\n"
-    "   popl %eax\n"
-    "   popl %ecx\n"
     "   ret\n"
 );
 #elif defined(ENVIRONMENT_ARM64) || defined(__aarch64__) || defined(_M_ARM64)

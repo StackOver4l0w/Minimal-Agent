@@ -66,7 +66,7 @@ typedef unsigned short WCHAR, *PWCHAR;
 	#endif
  #endif
 
-#if defined(x86) || defined(_M_IX86)
+#if defined(x86) || defined(__i386__) || defined(_M_IX86)
 typedef unsigned int USIZE, *PUSIZE;
 #else
 typedef unsigned long long USIZE, *PUSIZE;
