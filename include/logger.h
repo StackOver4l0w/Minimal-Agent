@@ -2,43 +2,37 @@
 
 #include "types.h"
 
-void log_write(const char* buffer, unsigned long len);
-
-/**
- * Helper macro to create stack-allocated string from literal
- * Ensures string remains on stack for logging (no .rdata)
- */
-#define STACK_STR(var_name, str) \
-    char var_name[] = str; \
-    volatile char* p_##var_name = (volatile char*)var_name; (void)p_##var_name
-#define LOGGING_ENABLED
 #ifdef LOGGING_ENABLED
 
-/**
- * Log informational message to stdout
- * Only accepts string literals (no format specifiers)
- * String is built on stack, not in .rdata
- * Example: LOG_INFO("Agent started\n");
- */
-#define LOG_INFO(literal) \
-    do { \
-        STACK_STR(__log_msg, literal "\n"); \
-        log_write(__log_msg, sizeof(__log_msg) - 1); \
-    } while(0)
+#include <stdarg.h>
 
-/**
- * Log error message to stdout with [ERR] prefix
- * Only accepts string literals (no format specifiers)
- * String is built on stack, not in .rdata
- * Example: LOG_ERROR("Failed to open shell\n");
- */
-#define LOG_ERROR(literal) \
+#define LOG_LINE_MAX 256
+
+void log_write(const char *buffer, unsigned long len);
+INT32 Format(PCHAR s, SIZE_T size, const PCHAR format, ...);
+INT32 FormatV(PCHAR s, SIZE_T size, const PCHAR format, va_list args);
+
+#define LOG_INFO(fmt, ...) \
     do { \
-        STACK_STR(__log_err, literal "\n"); \
-        log_write(__log_err, sizeof(__log_err) - 1); \
-    } while(0)
+        CHAR __log_buf[LOG_LINE_MAX]; \
+        INT32 __log_n = Format(__log_buf, sizeof(__log_buf), \
+                               "[INF] " fmt "\n", ##__VA_ARGS__); \
+        if (__log_n > 0) \
+            log_write(__log_buf, (unsigned long)__log_n); \
+    } while (0)
+
+#define LOG_ERROR(fmt, ...) \
+    do { \
+        CHAR __log_buf[LOG_LINE_MAX]; \
+        INT32 __log_n = Format(__log_buf, sizeof(__log_buf), \
+                               "[ERR] " fmt "\n", ##__VA_ARGS__); \
+        if (__log_n > 0) \
+            log_write(__log_buf, (unsigned long)__log_n); \
+    } while (0)
 
 #else
-#define LOG_INFO(literal)  ((void)0)
-#define LOG_ERROR(literal) ((void)0)
+
+#define LOG_INFO(fmt, ...)  ((void)0)
+#define LOG_ERROR(fmt, ...) ((void)0)
+
 #endif

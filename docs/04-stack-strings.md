@@ -123,7 +123,7 @@ What lives in `stackstrings.h` today, by consumer:
 | `StrGetMethodW` | `GET` (wide) | WinHttpOpenRequest |
 | `StrCmdline` | `cmd.exe /K chcp 65001 >nul` (wide) | shell spawn |
 | `StrRegPath` `StrMachineGuid` | registry path / value name | identity UUID read |
-| `StrEnvUrl` | `URL` | entry.c env lookup |
+| `StrEnvUrl` | `W_URL` | entry.c env lookup |
 | `StrCommitDefault` | `course01` | identity commit tag |
 | `StrHdrApiVersion` `StrHdrNameId` `StrHdrPlatform` `StrHdrCaps` | whole identity header lines | identity block (see 05) |
 | `StrLblUuid` `StrLblHostname` `StrLblUsername` `StrLblOsVersion` `StrLblBuild` `StrLblCommit` | header labels (value follows) | identity block |

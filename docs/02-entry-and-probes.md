@@ -39,13 +39,13 @@ void entry(void)
 
     CHAR url_arg[2048];
     if (GetVariable(env_name, url_arg, sizeof(url_arg)) == 0) {
-        LOG_ERROR("Environment variable URL not set\n");
+        LOG_ERROR("Environment variable W_URL not set");
         return;
     }
 
     WCHAR url_arg_w[2048];
     if (AnsiToWide(url_arg, url_arg_w, 2048) < 0) {
-        LOG_ERROR("Environment variable URL is invalid\n");
+        LOG_ERROR("Environment variable W_URL is invalid");
         return;
     }
 
@@ -61,7 +61,7 @@ Step by step:
    the kernel32 table (see [03 - PEB and Hash Resolution](03-peb-hash-resolution.md)).
    If this fails the process simply returns; there is no one to tell.
 
-2. **Build the name `URL` on the stack** (`StrEnvUrl`). It cannot be a
+2. **Build the name `W_URL` on the stack** (`StrEnvUrl`). It cannot be a
    string literal — literals live in `.rdata` and the blob has none
    (see [04 - Stack Strings](04-stack-strings.md)). This exact literal
    was once the last `.rdata` entry in the binary; as a stack string it
@@ -69,7 +69,7 @@ Step by step:
 
 3. **Read the environment block through the PEB**
    (`GetVariable`, [03](03-peb-hash-resolution.md) §5). The relay address
-   arrives as the `URL` environment variable of the host process —
+   arrives as the `W_URL` environment variable of the host process —
    argv does not exist here (no CRT parsed it), and a loader that runs
    the blob inside another process inherits that process's environment.
 

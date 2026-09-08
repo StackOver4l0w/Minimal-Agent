@@ -102,8 +102,8 @@ jobs:
               entry.c src/stack_probes.c src/main.c src/identity_headers.c \
               src/transport.c src/shell.c src/report.c src/system_facts.c \
               src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c \
-              src/advapi.c src/string.c src/memory.c src/peb.c src/system.c \
-              src/djb2.c src/logger.c
+              src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c \
+              src/system.c src/djb2.c src/logger.c
             mv ./*.o obj/
             objects=(obj/entry.o)
             for object in obj/*.o; do
@@ -145,7 +145,6 @@ jobs:
             exit 1
           fi
 
-
           # Gate 4: all read-only blob data must be inside .text. Since the
           # linker intentionally merges data into .text, objdump -d cannot
           # distinguish embedded strings from instructions and cannot safely
@@ -157,6 +156,22 @@ jobs:
             fi
           done
           echo "blob section layout: .text contains read-only data; no separate data sections"
+
+          # Gate 5: the silent blob must contain NO printable strings -
+          # a leaked log/format literal in the release .bin is a
+          # build-contract break (logging is a -DLOGGING_ENABLED build
+          # option and must stay out of this artifact).
+          # -n 12: on ~16-24KB of code the expected random printable-run
+          # count is ~0.15, so a hit is a real literal, not code bytes; if
+          # a code-bytes artifact ever trips this, eyeball it, then bump
+          # to -n 14 or pin an allowlist.
+          n=$(strings -n 12 minimal_agent.bin | wc -l)
+          echo "strings -n 12 hits: $n (want 0)"
+          if [ "$n" != "0" ]; then
+            strings -n 12 minimal_agent.bin
+            echo "FAIL: log/string literals leaked into the release blob"
+            exit 1
+          fi
           mkdir -p artifacts
           cp minimal_agent.exe "artifacts/windows-${{ matrix.arch }}.exe"
           cp minimal_agent.bin "artifacts/windows-${{ matrix.arch }}.bin"
@@ -187,7 +202,9 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-          pattern: build-*
+          # Release flavors only - the dev flavor (build-windows-*-dev)
+          # must not ride into the rolling preview release.
+          pattern: build-windows-{i386,x86_64,aarch64}-release
 
       - name: Collect release files
         run: |

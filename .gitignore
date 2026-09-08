@@ -17,3 +17,6 @@ notes/
 
 # Local test harness (kept personal for now)
 shell_harness.py
+
+# Blob artifacts (cut from the exe, never shipped via git)
+*.bin
