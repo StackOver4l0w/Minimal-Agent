@@ -16,7 +16,9 @@ commands inside a local hidden `cmd.exe` (the Shell capability).
 **Language:** C (freestanding — no libc, no SDK headers)
 **Build system:** gcc / clang one-liners + GNU binutils; GitHub Actions for
 cross-arch releases
-**Targets:** Windows x86_64 (local), plus i386 / aarch64 cross-built in CI
+**Targets:** Windows x86_64 (local), plus i386 / aarch64 cross-built in CI.
+Runtime-verified: x86_64 natively, i386 under WOW64; aarch64 is
+gates-green, pending an ARM64 host.
 
 **Upstream context:** this agent is the minimal sibling of
 `Position-Independent-Agent` (PIA) in the same Nostdlib workspace. PIA

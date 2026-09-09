@@ -220,11 +220,14 @@ PE image, and the file then starts with `MZ`).
 
 ```sh
 head -c 2 agent.bin            # must NOT be "MZ"
-strings -n 12 agent.bin        # must print NOTHING
+strings -n 14 agent.bin | grep -cE '[a-z]+ [a-z]+'   # must print 0
 ```
 
-The strings-empty rule is enforced by a CI gate (`strings -n 12`
-must find nothing in the release shellcode).
+The literal rule is enforced by a CI gate: a leaked literal is an
+English phrase — lowercase words with spaces — so the gate counts
+literal-shaped hits, not raw printable runs (clang's register-push
+prologues are pure printable ASCII and would false-positive any raw
+scan).
 
 ---
 
@@ -368,11 +371,19 @@ aarch64) and bakes the identity metadata (`-DID_BUILD_NUMBER`,
 
 - **build.yml** — on push/PR: builds all three arches and runs the
   gates (empty imports; entry at `.text` byte 0; the `.bin` not
-  starting with `MZ`; no separate data sections; **`.bin`
-  strings-empty**). On pushes to main it also republishes the rolling
-  `preview` pre-release;
+  starting with `MZ`; no separate data sections; no literal-shaped
+  strings in the release `.bin`). On pushes to main it also republishes
+  the rolling `preview` pre-release;
 - **release.yml** — on a `v*` tag: the same gated binaries as a stable
-  GitHub Release (`windows-{i386,x86_64,aarch64}.{exe,bin}`).
+  GitHub Release (`windows-{i386,x86_64,aarch64}.{exe,bin}`) plus dev
+  flavors with printf logging for i386 and x86_64
+  (`windows-{i386,x86_64}-dev.{exe,bin}`).
+
+Runtime status: **x86_64 and i386 are live-verified** (x86_64
+natively; i386 under WOW64 — PEB walk, hash resolution, WinHTTP
+transport and the full connect/backoff loop, plus blob injection into
+a SysWOW64 host). aarch64 passes every build gate and awaits its
+ARM64-host run.
 
 The `.bin` assets are cut with `--dump-section .text=…` — byte 0 is
 `entry()`, load-and-jump ready.
