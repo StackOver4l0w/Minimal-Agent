@@ -22,9 +22,10 @@ jobs:
           - { arch: i386,    triple: i686-w64-mingw32,    flavor: release, extra: -mno-sse }
           - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: release, extra: "" }
           - { arch: aarch64, triple: aarch64-w64-mingw32, flavor: release, extra: "" }
-          # Dev flavor: printf-logging agent for debugging (one arch).
-          # Its .bin carries the log literals inside .text and is exempt
-          # from the literal gate - the strings ARE its feature.
+          # Dev flavors: printf-logging agents for debugging. Their .bin
+          # carries the log literals inside .text and is exempt from the
+          # literal gate - the strings ARE the feature.
+          - { arch: i386,    triple: i686-w64-mingw32,    flavor: dev, extra: -mno-sse }
           - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: dev, extra: "" }
     steps:
       - name: Checkout
