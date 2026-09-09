@@ -1,17 +1,16 @@
 {
     "version": "0.2.0",
-    // Debugging: only i386 (WOW64) and x86_64 run on an x64 Windows host;
-    // the aarch64 exe builds fine but needs ARM64 hardware to execute.
-    // Set args[0] to your relay URL before launching.
     "configurations": [
         {
             "name": "windows-x86_64-debug",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/windows-x86_64-debug.exe",
-            "args": ["https://relay.nostdlib.workers.dev/agent", "-v"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
+            "environment": [
+                { "name": "W_URL", "value": "https://relay.example.com" }
+            ],
             "preLaunchTask": "windows-x86_64-debug"
         },
         {
@@ -19,9 +18,11 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/windows-i386-debug.exe",
-            "args": ["https://relay.nostdlib.workers.dev/agent", "-v"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
+            "environment": [
+                { "name": "W_URL", "value": "https://relay.example.com" }
+            ],
             "preLaunchTask": "windows-i386-debug"
         }
     ]
