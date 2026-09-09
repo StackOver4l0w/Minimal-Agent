@@ -19,13 +19,13 @@ void entry(void)
 
     CHAR url_arg[2048];
     if (GetVariable(env_name, url_arg, sizeof(url_arg)) == 0) {
-        LOG_ERROR("Environment variable URL not set\n");
+        LOG_ERROR("Environment variable W_URL not set");
         return;
     }
 
     WCHAR url_arg_w[2048];
     if (AnsiToWide(url_arg, url_arg_w, 2048) < 0) {
-        LOG_ERROR("Environment variable URL is invalid\n");
+        LOG_ERROR("Environment variable W_URL is invalid");
         return;
     }
 
