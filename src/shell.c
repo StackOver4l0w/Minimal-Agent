@@ -28,6 +28,7 @@ int shell_spawn(shell_slot *slot)
 
     STARTUPINFOW si;
     MemoryZero(&si, sizeof(si));
+    si.cb         = sizeof(si);
     si.dwFlags    = STARTF_USESTDHANDLES;
     si.hStdInput  = stdin_r;
     si.hStdOutput = stdout_w;
