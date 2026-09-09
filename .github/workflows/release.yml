@@ -19,13 +19,13 @@ jobs:
       matrix:
         include:
           # The three Windows arches the C2 Agents table tags (X86/AMD64/ARM64)
-          - { arch: i386,    triple: i686-w64-mingw32,    flavor: release }
-          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: release }
-          - { arch: aarch64, triple: aarch64-w64-mingw32, flavor: release }
+          - { arch: i386,    triple: i686-w64-mingw32,    flavor: release, extra: -mno-sse }
+          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: release, extra: "" }
+          - { arch: aarch64, triple: aarch64-w64-mingw32, flavor: release, extra: "" }
           # Dev flavor: printf-logging agent for debugging (one arch).
           # Its .bin carries the log literals inside .text and is exempt
           # from the literal gate - the strings ARE its feature.
-          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: dev }
+          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: dev, extra: "" }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -87,7 +87,7 @@ jobs:
             rm -rf obj
             mkdir -p obj
             ${{ matrix.triple }}-gcc -O2 -Iinclude $DEFS -Wall -Wextra \
-              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
+              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize ${{ matrix.extra }} \
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
               -c \
@@ -102,7 +102,7 @@ jobs:
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
             ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude $DEFS -Wall -Wextra \
-              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize \
+              -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize ${{ matrix.extra }} \
               -e entry \
               -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text \
               -o "$EXE" "${objects[@]}"
@@ -134,7 +134,7 @@ jobs:
           # linker intentionally merges data into .text, objdump -d cannot
           # distinguish embedded strings from instructions and cannot safely
           # validate RIP-relative references in the final image.
-          for section in .rdata .rodata .data .bss; do
+          for section in .rdata .rodata .data .bss .pdata .xdata; do
             if ${{ matrix.triple }}-objdump -h "$EXE" | awk -v name="$section" '$2 == name { found = 1 } END { exit !found }'; then
               echo "FAIL: forbidden separate section remains: $section"
               exit 1
