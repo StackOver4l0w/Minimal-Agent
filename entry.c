@@ -4,12 +4,15 @@
 #include "environment.h"
 #include "string.h"
 #include "stackstrings.h"
+#include "picfixup.h"
 
 
 
 __attribute__((section(".text"), used))
 void entry(void)
 {
+    PIC_ApplyFixups();
+
     KERNEL32 entry_k32;
     if (!KERNEL32_Ctor(&entry_k32))
         return;
