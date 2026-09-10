@@ -200,7 +200,7 @@ limitation, documented as such in the README.
 
 ## 7. Reading Environment Variables (the PEB's Second Job)
 
-`src/environment.c` implements `GetVariable("URL", buffer, size)` — the
+`src/environment.c` implements `GetVariable("W_URL", buffer, size)` — the
 CRT `getenv` replacement, and the only way the agent learns its relay
 address.
 
@@ -208,13 +208,21 @@ The environment lives at `PEB->ProcessParameters->Environment`: a block
 of NUL-terminated `NAME=value` UTF-16 strings, double-NUL at the end:
 
 ```
-L"URL=https://relay.example.com\0L"PATH=C:\\...\0\0"
+L"W_URL=https://relay.example.com\0L"PATH=C:\\...\0\0"
 ```
 
 The walk uppercases both sides during comparison (`CompareEnvName`) so
 `url=` matches `URL=` — Windows env vars are case-insensitive; the copy
 into the caller's buffer narrows UTF-16 to ASCII (relay URLs are ASCII;
 non-ASCII bytes are truncated, which is fine for this contract).
+
+`RTL_USER_PROCESS_PARAMETERS` in `include/peb.h` must stay
+naturally aligned — no explicit pad members. Natural alignment puts
+`Environment` at the OS-correct offset on every arch (0x48 on i386,
+0x80 on x86_64/aarch64); a hardcoded pad would be right on one arch and
+silently shift every field on the other. An earlier revision carried
+such a pad plus a duplicate `_EX` struct to work around it; both are
+gone.
 
 ---
 

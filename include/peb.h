@@ -32,15 +32,15 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS
 	UINT32 DebugFlags;
 	PVOID ConsoleHandle;
 	UINT32 ConsoleFlags;
-	UINT32 Padding1;
 	PVOID StandardInput;
 	PVOID StandardOutput;
 	PVOID StandardError;
-	UNICODE_STRING CurrentDirectoryPath;
-	PVOID CurrentDirectoryHandle;
+	UNICODE_STRING CurrentDirectory_DosPath;
+	PVOID CurrentDirectory_Handle;
 	UNICODE_STRING DllPath;
 	UNICODE_STRING ImagePathName;
 	UNICODE_STRING CommandLine;
+	PWCHAR Environment;
 } RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
 
 typedef struct _PEB_LDR_DATA
@@ -63,25 +63,6 @@ typedef struct _PEB
 	PPEB_LDR_DATA LoaderData;
 	PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
 } PEB, *PPEB;
-
-typedef struct _RTL_USER_PROCESS_PARAMETERS_EX
-{
-	UINT32 MaximumLength;
-	UINT32 Length;
-	UINT32 Flags;
-	UINT32 DebugFlags;
-	PVOID ConsoleHandle;
-	UINT32 ConsoleFlags;
-	PVOID StandardInput;
-	PVOID StandardOutput;
-	PVOID StandardError;
-	UNICODE_STRING CurrentDirectory_DosPath;
-	PVOID CurrentDirectory_Handle;
-	UNICODE_STRING DllPath;
-	UNICODE_STRING ImagePathName;
-	UNICODE_STRING CommandLine;
-	PWCHAR Environment;
-} RTL_USER_PROCESS_PARAMETERS_EX;
 
 PPEB GetCurrentPEB(void);
 PVOID GetModuleHandleFromPEB(UINT64 moduleNameHash);

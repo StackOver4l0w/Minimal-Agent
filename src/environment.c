@@ -34,7 +34,7 @@ USIZE GetVariable(const CHAR *name, CHAR *buffer, USIZE bufferSize){
     if(peb == NULL || peb->ProcessParameters == NULL)
         return 0;
 
-    RTL_USER_PROCESS_PARAMETERS_EX *params = ( RTL_USER_PROCESS_PARAMETERS_EX *)peb->ProcessParameters;
+    RTL_USER_PROCESS_PARAMETERS *params = (RTL_USER_PROCESS_PARAMETERS *)peb->ProcessParameters;
 	PWCHAR envBlock = params->Environment;
 
 	if (envBlock == NULL)

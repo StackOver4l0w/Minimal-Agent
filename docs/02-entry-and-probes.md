@@ -119,13 +119,15 @@ compiler's stack-probe helpers:
 | Arch | Symbol the compiler calls | Contract |
 |---|---|---|
 | x86_64 | `__chkstk` / `___chkstk_ms` | RAX = bytes needed; walk pages DOWN from `[rsp+0x18]`, `orq 0,(rcx)` to commit each guard page; RSP untouched |
-| i386 | `__alloca` | EAX = bytes; same walk with 32-bit regs |
+| i386 | `__alloca`, `__chkstk`, `_chkstk`, `___alloca` | EAX = bytes; page walk probes below the frame, then **rewrites ESP** — the probe itself allocates: it moves the return address down to the new stack top, sets ESP to the frame base, and returns into the caller. The caller addresses locals at positive ESP offsets and frees with `add esp, N` |
+| i386 | `___chkstk_ms` / `__chkstk_ms` | EAX = bytes; SP-untouched walk (a different contract — callers adjust) |
 | aarch64 | `__chkstk` | X15 = bytes; probe down with `str xzr` |
 
-Any function whose frame exceeds one page (ours go up to 72 KB —
-`run_session` carries a 64 KB message buffer on its frame) calls one of
-these before `sub rsp`, so the OS can grow the stack legally instead of
-the allocation skipping the guard page and faulting.
+Any function whose frame exceeds one page (ours go up to 142 KB on
+i386 — `run_session` carries a 64 KB message buffer on its frame) calls
+one of these before touching locals, so the OS can grow the stack
+legally instead of the allocation skipping the guard page and
+faulting.
 
 Why not in `entry.c`? Because **top-level `asm()` always occupies the
 start of the object's `.text`** — regardless of where in the file it is
@@ -137,10 +139,16 @@ were split out precisely so `entry.c` contains nothing but `entry()`.
 gcc's default section name sort first — never worked either: the asm
 still preceded the function inside the object.)
 
-The probe implementations are transcriptions of libgcc's canonical
-versions. An earlier hand-rolled variant misread the contract (size in
-R10 instead of RAX) and crashed on the first big frame — the current
-ones are verbatim ports with the contract documented in the file.
+The probe implementations are transcriptions of compiler-rt's canonical
+versions (`chkstk.S` for the SP-untouched `_ms` family, `chkstk2.S` for
+the ESP-consuming `__alloca` family on i386). Two earlier hand-rolled
+variants misread the contract — one used R10 instead of RAX on x86_64,
+one gave the i386 `__alloca` aliases the SP-untouched semantics — and
+each crashed on the first big frame. The i386 split is load-bearing:
+clang-i686 emits `movl $size,%eax; call __alloca` and then addresses
+locals at positive ESP offsets with no `sub`, so every >4 KB frame on
+i386 requires the ESP-consuming body. All three arches are live-verified
+(x86_64 natively, i386 under WOW64).
 
 ---
 

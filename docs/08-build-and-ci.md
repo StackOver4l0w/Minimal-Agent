@@ -69,22 +69,27 @@ exe runs, the blob doesn't.
 **Gate 3 — the blob is not the image.** First two bytes of the `.bin`
 must not be `MZ`. Catches the objcopy incantation regression.
 
-**Gate 4 — no rip-relative reference leaves `.text`.** Disassemble,
-collect every `# 0x…` annotation, fail if any lands outside
-`[.text start, .text end)`:
+**Gate 4 — no separate data section survives.** The linker merges
+`.rdata`/`.rodata` into `.text`; the gate then asserts none of
+`.rdata .rodata .data .bss .pdata .xdata` exists as a section in the
+linked exe. Any surviving section means a constant escaped the merge —
+a blob that would fault at runtime on its first reference while every
+other gate stayed green.
 
-```sh
-objdump -d minimal_agent.exe | grep -oE '# 0x[0-9a-f]+' | sort -u |
-  awk -v s=$text_start -v e=$text_end '{ a = strtonum(...);
-       if (a < s || a >= e) print a }'
-```
+(A stronger form — disassembling and checking every annotated
+rip-relative target lands inside `.text` — was prototyped during the
+no-import rework and caught every pooling casualty: SSE constant
+pools, double literals, wide string literals, the
+SECURITY_ATTRIBUTES initializer. It is not what CI runs today; the
+section-existence form is the shipped gate.)
 
-This is the gate that caught **every pooling casualty**: the SSE
-constant pools (12 refs), the double literals, the wide string
-literals, the SECURITY_ATTRIBUTES initializer (2 refs), — each one a
-blob that would fault at runtime while every other gate stayed green.
-It is the only gate that inspects what the code actually *references*
-rather than what sections exist.
+On i386 the merge carries one unavoidable passenger: lld synthesizes a
+16–32 byte `.rdata` SEH stub for every PE it links, even for a trivial
+`int f(){return 0;}`. The merge folds it into `.text`; `-mno-sse` on
+the i386 legs keeps everything else out — without it clang-i686
+materializes the 64-bit API-hash constants as SSE constant pools
+(`movaps` loads from `.rdata`), which is the one real source of
+constants the flags do not already suppress.
 
 ---
 
@@ -128,15 +133,16 @@ call sites vanish.
   because raw printable runs false-positive on x86_64 clang register-
   push prologues (`AWAVAUATVWUSPH…` is pure printable ASCII).
 
-`release.yml` (on `v*` tags) runs the same gated build plus a dev
-flavor (x86_64, `-DLOGGING_ENABLED`, exempt from the literal gate) and
-attaches `windows-{i386,x86_64,aarch64}.{exe,bin}` and
-`windows-x86_64-dev.{exe,bin}` to a GitHub Release. The `.bin` assets
-are cut with `--dump-section` — byte 0 is `entry()`,
+`release.yml` (on `v*` tags) runs the same gated build plus dev
+flavors (i386 and x86_64, `-DLOGGING_ENABLED`, exempt from the literal
+gate) and attaches `windows-{i386,x86_64,aarch64}.{exe,bin}` and
+`windows-{i386,x86_64}-dev.{exe,bin}` to a GitHub Release. The `.bin`
+assets are cut with `--dump-section` — byte 0 is `entry()`,
 load-and-jump ready.
 
 On pushes to `main`, build.yml additionally republishes the rolling
-`preview` pre-release.
+`preview` pre-release (release legs only — dev flavors never ride
+into it).
 
 ---
 
@@ -176,6 +182,10 @@ One `.text` section (plus two dozen bytes of linker stub nothing
 references), zero imports, zero strings, zero statics — verified on
 every build, on three architectures, under two compilers. The blob
 runs from a loader or an injector exactly as the exe runs from a
-shell. What remains is scope, not form: more opcodes (files, screens),
-direct syscalls, and the OPSEC layer — each of which slots into the
-existing modules without touching the invariants this chapter defends.
+shell — runtime-verified on x86_64 (natively) and i386 (under WOW64:
+PEB walk, hash resolution, WinHTTP transport, 142 KB frames through
+the split probe contracts). aarch64 builds pass every gate but still
+awaits its ARM64-host acceptance run. What remains is scope, not form:
+more opcodes (files, screens), direct syscalls, and the OPSEC layer —
+each of which slots into the existing modules without touching the
+invariants this chapter defends.
