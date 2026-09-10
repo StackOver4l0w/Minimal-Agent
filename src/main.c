@@ -221,6 +221,8 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
 
     WCHAR host[256];
     WCHAR path[2048];
+    MemoryZero(host, sizeof(host));
+    MemoryZero(path, sizeof(path));
     uc.lpszHostName    = host;  uc.dwHostNameLength = 256;
     uc.lpszUrlPath     = path;  uc.dwUrlPathLength  = 2048;
 
@@ -229,6 +231,8 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
         rc = RC_LOCAL_ERROR;
         goto cleanup;
     }
+    host[uc.dwHostNameLength] = L'\0';
+    path[uc.dwUrlPathLength]  = L'\0';
     if (uc.nScheme != INTERNET_SCHEME_HTTP &&
         uc.nScheme != INTERNET_SCHEME_HTTPS) {
         LOG_ERROR("Only http:// and https:// URLs are supported\n");
