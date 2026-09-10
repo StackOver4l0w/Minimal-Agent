@@ -369,24 +369,31 @@ Cross-builds the three Windows architectures with
 aarch64) and bakes the identity metadata (`-DID_BUILD_NUMBER`,
 `-DAGENT_COMMIT_HASH`):
 
-- **build.yml** — on push/PR: builds all three arches and runs the
-  gates (empty imports; entry at `.text` byte 0; the `.bin` not
-  starting with `MZ`; no separate data sections; no literal-shaped
-  strings in the release `.bin`). On pushes to main it also republishes
-  the rolling `preview` pre-release;
+- **build.yml** — on push/PR: builds all three arches (release) plus
+  dev flavors for i386 and x86_64, and runs the gates (empty imports;
+  entry at `.text` byte 0; the `.bin` not starting with `MZ`; no
+  separate data sections; no literal-shaped strings in the release
+  `.bin`). On pushes to main it also republishes the rolling `preview`
+  pre-release — release and dev binaries together, so anyone can grab
+  a logging build without compiling;
 - **release.yml** — on a `v*` tag: the same gated binaries as a stable
   GitHub Release (`windows-{i386,x86_64,aarch64}.{exe,bin}`) plus dev
   flavors with printf logging for i386 and x86_64
   (`windows-{i386,x86_64}-dev.{exe,bin}`).
 
 Runtime status: **x86_64 and i386 are live-verified** (x86_64
-natively; i386 under WOW64 — PEB walk, hash resolution, WinHTTP
-transport and the full connect/backoff loop, plus blob injection into
-a SysWOW64 host). aarch64 passes every build gate and awaits its
-ARM64-host run.
+natively; i386 on native 32-bit Windows 8/10 and under WOW64 — PEB
+walk, hash resolution, WinHTTP transport, the full connect/backoff
+loop, and blob injection into a host process at an arbitrary base).
+aarch64 passes every build gate and awaits its ARM64-host run.
 
 The `.bin` assets are cut with `--dump-section .text=…` — byte 0 is
-`entry()`, load-and-jump ready.
+`entry()`, load-and-jump ready. On i386 the dev `.bin` carries its own
+PE base-relocation table inside `.text` and applies it at startup
+(`src/picfixup.c`): i386 has no RIP-relative addressing, so the
+logging literals are absolute-addressed and every load at a foreign
+base re-slides them before the first log line. The release `.bin`
+needs no such step — it contains zero absolute references.
 
 ---
 
