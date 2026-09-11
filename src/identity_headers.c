@@ -51,9 +51,7 @@ static int read_machine_guid_text(CHAR guid_text[40])
         return 0;
 
     DWORD type = 0;
-    BOOL ok = advapi.RegQueryValueExA(key, guidname, NULL, &type,
-                                      (unsigned char *)guid_text,
-                                      &size) == ERROR_SUCCESS && type == REG_SZ;
+    BOOL ok = advapi.RegQueryValueExA(key, guidname, NULL, &type, (unsigned char *)guid_text, &size) == ERROR_SUCCESS && type == REG_SZ;
     advapi.RegCloseKey(key);
     return ok && guid_text[0] != '\0' ? 1 : 0;
 }

