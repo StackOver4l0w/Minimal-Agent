@@ -5,3 +5,4 @@
 #endif
 
 UINT64 Hash(const WCHAR* str);
+UINT64 HashAscii(const CHAR* str);

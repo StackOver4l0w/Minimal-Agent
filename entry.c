@@ -7,7 +7,6 @@
 #include "picfixup.h"
 
 
-
 __attribute__((section(".text"), used))
 void entry(void)
 {

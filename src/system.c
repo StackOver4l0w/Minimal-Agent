@@ -1,33 +1,8 @@
 #include "system.h"
 #include "djb2.h"
 #include "apihash.h"
-
-static BOOL AsciiEquals(const CHAR *left, const CHAR *right)
-{
-    if (left == NULL || right == NULL)
-        return FALSE;
-
-    while (*left != '\0' && *right != '\0') {
-        if (*left != *right)
-            return FALSE;
-        left++;
-        right++;
-    }
-
-    return (*left == '\0' && *right == '\0');
-}
-
-static UINT64 HashAscii(const CHAR *s)
-{
-    UINT64 h = API_HASH_SEED;
-    for (UINT64 i = 0; s[i] != '\0'; ++i) {
-        CHAR c = s[i];
-        if (c >= 'A' && c <= 'Z')
-            c = (CHAR)(c - 'A' + 'a');
-        h = ((h << 5) + h) + (UINT64)(UINT8)c;
-    }
-    return h;
-}
+#include "string.h"
+#include "djb2.h"
 
 PVOID ResolveExportByName(PVOID moduleBase, const CHAR *exportName)
 {
@@ -155,12 +130,6 @@ PVOID ResolveExportByHash(PVOID moduleBase, UINT64 exportHash)
     }
 
     return NULL;
-}
-
-PVOID ResolveFromModuleByName(const WCHAR *moduleName, const CHAR *exportName)
-{
-    PVOID moduleBase = GetModuleHandleFromPEB(Hash(moduleName));
-    return ResolveExportByName(moduleBase, exportName);
 }
 
 PVOID ResolveFromModuleByHash(UINT64 moduleNameHash, UINT64 exportHash)

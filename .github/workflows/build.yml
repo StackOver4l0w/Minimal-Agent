@@ -102,11 +102,11 @@ jobs:
               -DID_BUILD_NUMBER="$BUILD_NUMBER" \
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
               -c \
-              entry.c src/stack_probes.c src/picfixup.c src/main.c src/identity_headers.c \
-              src/transport.c src/shell.c src/report.c src/system_facts.c \
+              entry.c src/stack_probes.c src/picfixup.c src/main.c \
+              src/transport.c src/shell.c src/system_facts.c \
               src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c \
-              src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c \
-              src/system.c src/djb2.c src/logger.c
+              src/advapi.c src/string.c src/memory.c src/peb.c \
+              src/system.c src/djb2.c src/logger.c src/commands.c
             mv ./*.o obj/
             objects=(obj/entry.o)
             for object in obj/*.o; do

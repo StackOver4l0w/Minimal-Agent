@@ -7,7 +7,6 @@ panel. This chapter covers both.
 
 **Primary source files:**
 - `src/winhttp_api.c` + `include/winhttp_api.h` — the runtime table
-- `src/identity_headers.c` + `include/identity_headers.h` — the intro
 - `src/transport.c` + `include/transport.h` — send / receive framing
 - `src/main.c` `run_session()` — the connect sequence
 
