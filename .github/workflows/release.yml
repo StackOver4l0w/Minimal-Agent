@@ -91,12 +91,33 @@ jobs:
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
             PICDATA=""
+            if [ "${{ matrix.arch }}" = "i386" ]; then
+              printf '.section .picdata,"xr"\n.globl _pic_reloc\n.globl pic_reloc\n.globl _pic_reloc_size\n.globl pic_reloc_size\n.globl _pic_text_size\n.globl pic_text_size\n.p2align 2\n.long 0x50494301\n_pic_reloc:\npic_reloc:\n.space 8184\n.long 0x50494302\n_pic_reloc_size:\npic_reloc_size:\n.long 0x50494303\n_pic_text_size:\npic_text_size:\n.long 0\n' > picdata.s
+              ${{ matrix.triple }}-gcc -c picdata.s -o obj/picdata.o
+              objects+=("obj/picdata.o")
+              PICDATA="-Wl,/merge:.picdata=.text"
+            fi
             ${{ matrix.triple }}-gcc -O2 -s -nostdlib -Iinclude $DEFS -Wall -Wextra \
               -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector -fno-jump-tables -fno-vectorize -fno-slp-vectorize ${{ matrix.extra }} \
               -e entry \
               -Wl,/merge:.rdata=.text -Wl,/merge:.rodata=.text $PICDATA \
               -o "$EXE" "${objects[@]}"
           ${{ matrix.triple }}-objcopy --dump-section .text="$BIN" "$EXE"
+
+          if [ "${{ matrix.arch }}" = "i386" ]; then
+            ${{ matrix.triple }}-objcopy --dump-section .reloc=blob.reloc "$EXE"
+            TEXT_SIZE=$(stat -c%s "$BIN")
+            RELOC_SIZE=$(stat -c%s blob.reloc)
+            HEX=$(od -An -tx1 -v "$BIN" | tr -d ' \n')
+            OFF1=$(printf '%s' "$HEX" | awk '{n=index($0,"01434950"); if(n>0) print (n-1)/2}')
+            OFF2=$(printf '%s' "$HEX" | awk '{n=index($0,"02434950"); if(n>0) print (n-1)/2}')
+            OFF3=$(printf '%s' "$HEX" | awk '{n=index($0,"03434950"); if(n>0) print (n-1)/2}')
+            dd if=blob.reloc of="$BIN" bs=1 conv=notrunc seek=$((OFF1 + 4)) status=none
+            awk -v n="$RELOC_SIZE" 'BEGIN { printf "%c%c%c%c", n%256, int(n/256)%256, int(n/65536)%256, int(n/16777216)%256 }' | dd of="$BIN" bs=1 seek=$((OFF2 + 4)) conv=notrunc status=none
+            awk -v n="$TEXT_SIZE" 'BEGIN { printf "%c%c%c%c", n%256, int(n/256)%256, int(n/65536)%256, int(n/16777216)%256 }' | dd of="$BIN" bs=1 seek=$((OFF3 + 4)) conv=notrunc status=none
+            echo "pic reloc: $RELOC_SIZE bytes into reserve at blob+0x$((OFF1 + 4)), text=$TEXT_SIZE"
+            [ -n "$OFF1" ] && [ "$RELOC_SIZE" -gt 0 ] && [ "$RELOC_SIZE" -le 8184 ] || { echo "FAIL: pic reloc reserve overflow"; exit 1; }
+          fi
 
           imp=$(${{ matrix.triple }}-objdump -p "$EXE" | grep -c 'DLL Name' || true)
           echo "imports: $imp (want 0)"
