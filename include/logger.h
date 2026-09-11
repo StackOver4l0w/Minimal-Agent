@@ -2,12 +2,11 @@
 
 #include "types.h"
 
-#ifdef LOGGING_ENABLED
-
 #include <stdarg.h>
 
 #define LOG_LINE_MAX 256
 
+#if defined(LOGGING_ENABLED)
 void log_write(const char *buffer, unsigned long len);
 INT32 Format(PCHAR s, SIZE_T size, const PCHAR format, ...);
 INT32 FormatV(PCHAR s, SIZE_T size, const PCHAR format, va_list args);
@@ -29,10 +28,7 @@ INT32 FormatV(PCHAR s, SIZE_T size, const PCHAR format, va_list args);
         if (__log_n > 0) \
             log_write(__log_buf, (unsigned long)__log_n); \
     } while (0)
-
 #else
-
-#define LOG_INFO(fmt, ...)  ((void)0)
-#define LOG_ERROR(fmt, ...) ((void)0)
-
+    #define LOG_INFO(fmt, ...)
+    #define LOG_ERROR(fmt, ...)
 #endif
