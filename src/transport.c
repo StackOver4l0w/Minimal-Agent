@@ -1,18 +1,7 @@
 #include "transport.h"
 #include "memory.h"
 
-
-DWORD ws_send(const WINHTTP_API *api, HINTERNET socket, const void *data, DWORD length)
-{
-    if (api == NULL || api->WinHttpWebSocketSend == NULL || (data == NULL && length != 0))
-        return ERROR_MOD_NOT_FOUND;
-
-    return api->WinHttpWebSocketSend(socket,
-                                     WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE,
-                                     (void*)data, length);
-}
-
-DWORD ws_receive(const WINHTTP_API *api, HINTERNET socket, incoming_message *msg, BOOL *closed)
+DWORD WebSocketReceive(const WINHTTP_API *api, HINTERNET socket, incoming_message *msg, BOOL *closed)
 {
     if (api == NULL || msg == NULL || closed == NULL || api->WinHttpWebSocketReceive == NULL)
         return ERROR_MOD_NOT_FOUND;

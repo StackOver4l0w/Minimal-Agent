@@ -37,7 +37,6 @@ void collect_system_facts(system_facts *facts)
         info.dwOSVersionInfoSize = sizeof(info);
 
         if (ntdll.RtlGetVersion(&info) == 0) {
-
             INT32 pos = 0;
             UINT32 parts[3];
             volatile UINT32 *pv = parts;

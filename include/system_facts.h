@@ -4,9 +4,9 @@
 #include "protocol.h"
 
 typedef struct {
-    char hostname[ID_HOSTNAME_SIZE];
-    char username[ID_USERNAME_SIZE];
-    char os_version[ID_OS_VERSION_SIZE];
+    CHAR hostname[ID_HOSTNAME_SIZE];
+    CHAR username[ID_USERNAME_SIZE];
+    CHAR os_version[ID_OS_VERSION_SIZE];
 } system_facts;
 
 void collect_system_facts(system_facts *facts);

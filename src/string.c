@@ -17,6 +17,21 @@ __SIZE_TYPE__ wcslen(const WCHAR *s) {
     return len;
 }
 
+BOOL AsciiEquals(const CHAR *left, const CHAR *right)
+{
+    if (left == NULL || right == NULL)
+        return FALSE;
+
+    while (*left != '\0' && *right != '\0') {
+        if (*left != *right)
+            return FALSE;
+        left++;
+        right++;
+    }
+
+    return (*left == '\0' && *right == '\0');
+}
+
 INT32 AnsiToWide(const CHAR *ansi, PWCHAR wide, INT32 wideSize) {
     if (ansi == NULL || wide == NULL || wideSize <= 0) {
         return -1;

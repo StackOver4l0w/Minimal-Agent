@@ -1,5 +1,13 @@
 #pragma once
 
+static unsigned read_u32_le_at(const unsigned char *data, int off)
+{
+    return (unsigned)data[off]
+         | ((unsigned)data[off + 1] << 8)
+         | ((unsigned)data[off + 2] << 16)
+         | ((unsigned)data[off + 3] << 24);
+}
+
 static void write_u32_le(unsigned char *buf, int *pos, unsigned value)
 {
     for (int i = 0; i < 4; i++)

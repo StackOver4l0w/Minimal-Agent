@@ -1,7 +1,6 @@
 #pragma once
 
 #include "types.h"
-#include "wintypes.h"
 #include "protocol.h"
 
 #define SHELL_READ_OK       0
@@ -9,7 +8,7 @@
 #define SHELL_READ_DEAD     2
 
 typedef struct {
-    int     in_use;
+    INT32   in_use;
     HANDLE  stdin_w;
     HANDLE  stdout_r;
     HANDLE  process;
@@ -17,10 +16,10 @@ typedef struct {
 
 // #define SHELL_POOL shell_slot pool[SHELL_POOL_SIZE]
 
-int shell_open(shell_slot pool[]);
+INT32 shell_open(shell_slot pool[]);
 void shell_teardown(shell_slot *slot);
 shell_slot *shell_lookup(shell_slot pool[], unsigned long long id);
-int shell_write(shell_slot *slot, const void *data, DWORD len);
-int shell_spawn(shell_slot *slot);
-int shell_read(shell_slot *slot, unsigned char *out, DWORD cap, DWORD *out_len);
-// void shell_teardown_all(shell_slot pool[]);
+INT32 shell_write(shell_slot *slot, const void *data, DWORD len);
+INT32 shell_spawn(shell_slot *slot);
+INT32 shell_read(shell_slot *slot, unsigned char *out, DWORD cap, DWORD *out_len);
+

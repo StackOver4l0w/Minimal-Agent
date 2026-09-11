@@ -60,7 +60,7 @@ Remove-Item -Recurse -Force obj -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force obj | Out-Null
 
 # 2) Compile. Sources: entry.c in the root, the rest in src\, headers in include\.
-gcc -O2 -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+gcc -O2 -DLOGGING_ENABLED -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c src/picfixup.c
 
 # 3) Park the objects.
 Move-Item *.o obj
@@ -74,8 +74,8 @@ gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident
 ```sh
 rm -rf obj
 mkdir -p obj
-gcc -O2  -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
-    -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c
+gcc -O2 -DLOGGING_ENABLED -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
+    -c entry.c src/stack_probes.c src/main.c src/identity_headers.c src/transport.c src/shell.c src/report.c src/system_facts.c src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c src/system.c src/djb2.c src/logger.c 
 mv *.o obj/
 gcc -O2 -s -Iinclude -fno-asynchronous-unwind-tables -fno-shrink-wrap -fno-ident -fno-jump-tables -fno-tree-vectorize -fno-tree-slp-vectorize \
   -nostdlib -T linker.ld -e entry  -o minimal_agent.exe obj/entry.o $(ls obj/*.o | grep -v '/entry.o$')
