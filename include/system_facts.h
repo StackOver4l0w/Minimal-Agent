@@ -10,3 +10,4 @@ typedef struct {
 } system_facts;
 
 void collect_system_facts(system_facts *facts);
+int read_machine_guid_text(CHAR guid_text[40]);

@@ -33,61 +33,18 @@ typedef struct _URL_COMPONENTS
 
 typedef struct WINHTTP_API
 {
-
-    BOOL (WINAPI *WinHttpCrackUrl)(const WCHAR *pwszUrl,
-                                   DWORD dwUrlLength,
-                                   DWORD dwFlags,
-                                   URL_COMPONENTS *lpUrlComponents);
-
-    DWORD (WINAPI *WinHttpWebSocketSend)(HINTERNET hWebSocket,
-                                         WINHTTP_WEB_SOCKET_BUFFER_TYPE eBufferType,
-                                         PVOID pvBuffer,
-                                         DWORD dwBufferLength);
-
-    DWORD (WINAPI *WinHttpWebSocketReceive)(HINTERNET hWebSocket,
-                                            PVOID pvBuffer,
-                                            DWORD dwBufferLength,
-                                            DWORD *pdwBytesRead,
-                                            WINHTTP_WEB_SOCKET_BUFFER_TYPE *peBufferType);
-
-    HINTERNET (WINAPI *WinHttpOpen)(const WCHAR * pszAgentW,
-                                    DWORD dwAccessType,
-                                    const WCHAR * pszProxyW,
-                                    const WCHAR * pszProxyBypassW,
-                                    DWORD dwFlags);
-
-    HINTERNET (WINAPI *WinHttpConnect)(HINTERNET hSession,
-                                       const WCHAR * pswzServerName,
-                                       UINT16 nServerPort,
-                                       DWORD dwReserved);
-
-    HINTERNET (WINAPI *WinHttpOpenRequest)(HINTERNET hConnect,
-                                           const WCHAR * pswzVerb,
-                                           const WCHAR * pswzObject,
-                                           const WCHAR * pswzVersion,
-                                           const WCHAR * pswzReferrer,
-                                           const WCHAR * *ppszAcceptTypes,
-                                           DWORD dwFlags);
-
-    BOOL (WINAPI *WinHttpSetOption)(HINTERNET hInternet,
-                                    DWORD dwOption,
-                                    PVOID lpBuffer,
-                                    DWORD dwBufferLength);
-
-    BOOL (WINAPI *WinHttpSendRequest)(HINTERNET hRequest,
-                                      const WCHAR * lpszHeaders,
-                                      DWORD dwHeadersLength,
-                                      PVOID lpOptional,
-                                      DWORD dwOptionalLength,
-                                      DWORD dwTotalLength,
-                                      ULONG_PTR dwContext);
-
-    BOOL (WINAPI *WinHttpReceiveResponse)(HINTERNET hRequest,
-                                          PVOID lpReserved);
-
-    HINTERNET (WINAPI *WinHttpWebSocketCompleteUpgrade)(HINTERNET hRequest,
-                                                        ULONG_PTR dwContext);
-
+    BOOL (WINAPI *WinHttpCrackUrl)(const WCHAR *pwszUrl, DWORD dwUrlLength, DWORD dwFlags, URL_COMPONENTS *lpUrlComponents);
+    DWORD (WINAPI *WinHttpWebSocketSend)(HINTERNET hWebSocket, WINHTTP_WEB_SOCKET_BUFFER_TYPE eBufferType, PVOID pvBuffer, DWORD dwBufferLength);
+    DWORD (WINAPI *WinHttpWebSocketReceive)(HINTERNET hWebSocket, PVOID pvBuffer, DWORD dwBufferLength, DWORD *pdwBytesRead, WINHTTP_WEB_SOCKET_BUFFER_TYPE *peBufferType);
+    HINTERNET (WINAPI *WinHttpOpen)(const WCHAR * pszAgentW, DWORD dwAccessType, const WCHAR * pszProxyW, const WCHAR * pszProxyBypassW, DWORD dwFlags);
+    HINTERNET (WINAPI *WinHttpConnect)(HINTERNET hSession, const WCHAR * pswzServerName, UINT16 nServerPort, DWORD dwReserved);
+    HINTERNET (WINAPI *WinHttpOpenRequest)(HINTERNET hConnect, const WCHAR * pswzVerb, const WCHAR * pswzObject, WCHAR * pswzVersion,
+                                           const WCHAR * pswzReferrer, WCHAR * *ppszAcceptTypes, DWORD dwFlags);
+    BOOL (WINAPI *WinHttpSetOption)(HINTERNET hInternet, DWORD dwOption, PVOID lpBuffer, DWORD dwBufferLength);
+    BOOL (WINAPI *WinHttpSendRequest)(HINTERNET hRequest, const WCHAR * lpszHeaders, DWORD dwHeadersLength, PVOID lpOptional,
+                                      DWORD dwOptionalLength, DWORD dwTotalLength, ULONG_PTR dwContext);
+    BOOL (WINAPI *WinHttpReceiveResponse)(HINTERNET hRequest, PVOID lpReserved);
+    HINTERNET (WINAPI *WinHttpWebSocketCompleteUpgrade)(HINTERNET hRequest, ULONG_PTR dwContext);
     BOOL (WINAPI *WinHttpCloseHandle)(HINTERNET hInternet);
 } WINHTTP_API;
 

@@ -8,7 +8,6 @@ importantly, the traps that make it look deceptively simple.
 **Primary source files:**
 - `include/stackstrings.h` — the whole dictionary (~960 lines, most of
   it machine-generated)
-- `src/identity_headers.c` — the biggest consumer (see 05)
 
 ---
 

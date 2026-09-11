@@ -54,3 +54,26 @@ void collect_system_facts(system_facts *facts)
     }
 }
 
+int read_machine_guid_text(CHAR guid_text[40])
+{
+    guid_text[0] = '\0';
+
+    ADVAPI advapi;
+    HKEY key = NULL;
+    if (!ADVAPI_Ctor(&advapi))
+        return 0;
+
+    CHAR regpath[37];
+    StrRegPath(regpath);
+    CHAR guidname[12];
+    StrMachineGuid(guidname);
+
+    DWORD size = 39;
+    if (advapi.RegOpenKeyExA(HKEY_LOCAL_MACHINE, regpath, 0,KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
+        return 0;
+
+    DWORD type = 0;
+    BOOL ok = advapi.RegQueryValueExA(key, guidname, NULL, &type, (unsigned char *)guid_text, &size) == ERROR_SUCCESS && type == REG_SZ;
+    advapi.RegCloseKey(key);
+    return ok && guid_text[0] != '\0' ? 1 : 0;
+}

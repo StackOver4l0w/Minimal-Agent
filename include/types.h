@@ -6,7 +6,7 @@ typedef unsigned long long UINT64, *PUINT64;
 typedef void* PVOID;
 
 #ifndef VOID
-typedef void VOID;
+	typedef void VOID;
 #endif
 typedef unsigned int UINT32, *PUINT32;
 typedef unsigned short UINT16, *PUINT16;
@@ -84,9 +84,9 @@ DECLARE_HANDLE(HKEY);
 typedef DWORD REGSAM;
 
 #if defined(ENVIRONMENT_I386)
-typedef unsigned long ULONG_PTR;
+	typedef unsigned long ULONG_PTR;
 #else
-typedef unsigned long long ULONG_PTR;
+	typedef unsigned long long ULONG_PTR;
 #endif
 
 typedef ULONG_PTR SIZE_T;

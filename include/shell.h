@@ -14,8 +14,6 @@ typedef struct {
     HANDLE  process;
 } shell_slot;
 
-// #define SHELL_POOL shell_slot pool[SHELL_POOL_SIZE]
-
 INT32 shell_open(shell_slot pool[]);
 void shell_teardown(shell_slot *slot);
 shell_slot *shell_lookup(shell_slot pool[], unsigned long long id);

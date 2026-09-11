@@ -1,8 +1,6 @@
 #include "winhttp_api.h"
-#include "identity_headers.h"
 #include "wintypes.h"
 #include "memory.h"
-#include "string.h"
 #include "logger.h"
 #include "kernel32.h"
 #include "entry.h"

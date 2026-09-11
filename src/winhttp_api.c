@@ -49,7 +49,7 @@ BOOL WINHTTP_API_Ctor(WINHTTP_API *api)
                             ResolveExportByHash(winhttp, HASH_WINHTTPOPEN);
     api->WinHttpConnect = (HINTERNET (WINAPI *)(HINTERNET, const WCHAR *, UINT16, DWORD))
                             ResolveExportByHash(winhttp, HASH_WINHTTPCONNECT);
-    api->WinHttpOpenRequest = (HINTERNET (WINAPI *)(HINTERNET, const WCHAR *, const WCHAR *, const WCHAR *, const WCHAR *, const WCHAR **, DWORD))
+    api->WinHttpOpenRequest = (HINTERNET (WINAPI *)(HINTERNET, const WCHAR *, const WCHAR *, WCHAR *, const WCHAR *, WCHAR **, DWORD))
                             ResolveExportByHash(winhttp, HASH_WINHTTPOPENREQUEST);
     api->WinHttpSetOption = (BOOL (WINAPI *)(HINTERNET, DWORD, PVOID, DWORD))
                             ResolveExportByHash(winhttp, HASH_WINHTTPSETOPTION);
