@@ -81,7 +81,7 @@ jobs:
               -DAGENT_COMMIT_HASH="\"$COMMIT_HASH\"" \
               -c \
               entry.c src/stack_probes.c src/picfixup.c src/main.c src/identity_headers.c \
-              src/transport.c src/shell.c src/report.c src/system_facts.c \
+              src/transport.c src/shell.c src/system_facts.c \
               src/environment.c src/winhttp_api.c src/ntdll.c src/kernel32.c \
               src/advapi.c src/string.c src/logfmt.c src/memory.c src/peb.c \
               src/system.c src/djb2.c src/logger.c
