@@ -5,4 +5,4 @@
 
 #define IDENTITY_HEADERS_SIZE  900
 
-USIZE build_identity_headers(CHAR headers[IDENTITY_HEADERS_SIZE]);
+USIZE Handle_IdentityHeaders(CHAR headers[IDENTITY_HEADERS_SIZE]);

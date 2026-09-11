@@ -138,7 +138,7 @@ static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived)
     }
 
     CHAR headers_a[IDENTITY_HEADERS_SIZE];
-    USIZE headers_len = build_identity_headers(headers_a);
+    USIZE headers_len = Handle_IdentityHeaders(headers_a);
     if (headers_len == 0) {
         LOG_ERROR("identity header block does not fit\n");
         rc = RC_LOCAL_ERROR;

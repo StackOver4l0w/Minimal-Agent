@@ -68,7 +68,7 @@ static void hw_u32_decimal(hwriter *w, UINT32 value)
         hw_putc(w, rev[--n]);
 }
 
-USIZE build_identity_headers(CHAR headers[IDENTITY_HEADERS_SIZE])
+USIZE Handle_IdentityHeaders(CHAR headers[IDENTITY_HEADERS_SIZE])
 {
     hwriter w = { headers, headers + IDENTITY_HEADERS_SIZE, 1 };
     CHAR piece[64];
