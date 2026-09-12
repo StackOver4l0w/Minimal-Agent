@@ -6,6 +6,7 @@
 #include "system.h"
 #include "apihash.h"
 #include "wintypes.h"
+#include "kernel32.h"
 
 #define STD_OUTPUT_HANDLE  ((DWORD)-11)
 
