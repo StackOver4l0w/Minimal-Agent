@@ -14,17 +14,11 @@ void log_write(const char* buffer, unsigned long len)
     if (buffer == NULL || len == 0)
         return;
 
-    HANDLE (WINAPI *pGetStdHandle)(DWORD) =
-        (HANDLE (WINAPI *)(DWORD))
-        ResolveFromModuleByHash(HASH_MOD_KERNEL32, HASH_GETSTDHANDLE);
-    BOOL (WINAPI *pWriteFile)(HANDLE, const void *, DWORD, DWORD *, PVOID) =
-        (BOOL (WINAPI *)(HANDLE, const void *, DWORD, DWORD *, PVOID))
-        ResolveFromModuleByHash(HASH_MOD_KERNEL32, HASH_WRITEFILE);
-
-    if (pGetStdHandle == NULL || pWriteFile == NULL)
+    KERNEL32 kernel32;
+    if (!KERNEL32_Ctor(&kernel32))
         return;
 
-    HANDLE stdout_handle = pGetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE stdout_handle = kernel32.GetStdHandle(STD_OUTPUT_HANDLE);
 
     /* A console-less host (injected cmd.exe, GUI parent) yields
      * INVALID_HANDLE_VALUE (-1), not NULL - a NULL-only check passes
@@ -34,7 +28,7 @@ void log_write(const char* buffer, unsigned long len)
         return;
 
     DWORD written = 0;
-    pWriteFile(stdout_handle, (void*)buffer, (DWORD)len, &written, NULL);
+    kernel32.WriteFile(stdout_handle, (void*)buffer, (DWORD)len, &written, NULL);
 }
 
 #endif /* LOGGING_ENABLED */
