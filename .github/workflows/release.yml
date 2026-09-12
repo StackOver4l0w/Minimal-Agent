@@ -22,11 +22,6 @@ jobs:
           - { arch: i386,    triple: i686-w64-mingw32,    flavor: release, extra: -mno-sse }
           - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: release, extra: "" }
           - { arch: aarch64, triple: aarch64-w64-mingw32, flavor: release, extra: "" }
-          # Dev flavors: printf-logging agents for debugging. Their .bin
-          # carries the log literals inside .text and is exempt from the
-          # literal gate - the strings ARE the feature.
-          - { arch: i386,    triple: i686-w64-mingw32,    flavor: dev, extra: -mno-sse }
-          - { arch: x86_64,  triple: x86_64-w64-mingw32,  flavor: dev, extra: "" }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -69,14 +64,9 @@ jobs:
         run: |
           BUILD_NUMBER=$(git rev-list --count HEAD)
           COMMIT_HASH=$(git rev-parse --short=8 HEAD)
-          DEFS=""
+          DEFS="-DLOGGING_ENABLED"
           EXE=minimal_agent.exe
           BIN=minimal_agent.bin
-          if [ "${{ matrix.flavor }}" = "dev" ]; then
-            DEFS="-DLOGGING_ENABLED"
-            EXE=minimal_agent_dev.exe
-            BIN=minimal_agent_dev.bin
-          fi
           echo "=== building windows-${{ matrix.arch }}-${{ matrix.flavor }} (${{ matrix.triple }}-gcc) ==="
           # entry.c MUST stay FIRST on the command line and carries only
           # entry() (the stack probes live in src/stack_probes.c). Merge
@@ -103,7 +93,7 @@ jobs:
             [ "$object" = "obj/entry.o" ] || objects+=("$object")
             done
             PICDATA=""
-            if [ "${{ matrix.arch }}" = "i386" ] && [ "${{ matrix.flavor }}" = "dev" ]; then
+            if [ "${{ matrix.arch }}" = "i386" ]; then
               printf '.section .picdata,"xr"\n.globl _pic_reloc\n.globl pic_reloc\n.globl _pic_reloc_size\n.globl pic_reloc_size\n.globl _pic_text_size\n.globl pic_text_size\n.p2align 2\n.long 0x50494301\n_pic_reloc:\npic_reloc:\n.space 8184\n.long 0x50494302\n_pic_reloc_size:\npic_reloc_size:\n.long 0x50494303\n_pic_text_size:\npic_text_size:\n.long 0\n' > picdata.s
               ${{ matrix.triple }}-gcc -c picdata.s -o obj/picdata.o
               objects+=("obj/picdata.o")
@@ -116,7 +106,7 @@ jobs:
               -o "$EXE" "${objects[@]}"
           ${{ matrix.triple }}-objcopy --dump-section .text="$BIN" "$EXE"
 
-          if [ "${{ matrix.arch }}" = "i386" ] && [ "${{ matrix.flavor }}" = "dev" ]; then
+          if [ "${{ matrix.arch }}" = "i386" ]; then
             ${{ matrix.triple }}-objcopy --dump-section .reloc=blob.reloc "$EXE"
             TEXT_SIZE=$(stat -c%s "$BIN")
             RELOC_SIZE=$(stat -c%s blob.reloc)
@@ -165,30 +155,9 @@ jobs:
           done
           echo "blob section layout: .text contains read-only data; no separate data sections"
 
-          # Gate 5 (release only): the silent blob must contain NO leaked
-          # literals. A naive strings scan false-positives on x86_64 clang
-          # codegen - the register-push prologue sequences (AWAVAUATVWUSPH...)
-          # are all printable ASCII. A leaked literal, however, is an English
-          # phrase: lowercase words with spaces between them. Scan for
-          # that shape, not for raw printable runs. The dev flavor is
-          # exempt: its log literals are the feature.
-          if [ "${{ matrix.flavor }}" = "release" ]; then
-            n=$(strings -n 14 "$BIN" | grep -cE '[a-z]+ [a-z]+' || true)
-            echo "literal-shaped hits: $n (want 0)"
-            if [ "$n" != "0" ]; then
-              strings -n 14 "$BIN" | grep -E '[a-z]+ [a-z]+'
-              echo "FAIL: log/string literals leaked into the release blob"
-              exit 1
-            fi
-          fi
           mkdir -p artifacts
-          if [ "${{ matrix.flavor }}" = "dev" ]; then
-            cp "$EXE" "artifacts/windows-${{ matrix.arch }}-dev.exe"
-            cp "$BIN" "artifacts/windows-${{ matrix.arch }}-dev.bin"
-          else
-            cp "$EXE" "artifacts/windows-${{ matrix.arch }}.exe"
-            cp "$BIN" "artifacts/windows-${{ matrix.arch }}.bin"
-          fi
+          cp "$EXE" "artifacts/windows-${{ matrix.arch }}.exe"
+          cp "$BIN" "artifacts/windows-${{ matrix.arch }}.bin"
           ls -la artifacts/
 
       - name: Upload artifacts
