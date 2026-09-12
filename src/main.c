@@ -6,6 +6,7 @@
 #include "entry.h"
 #include "stackstrings.h"
 #include "commands.h"
+#include "string.h"
 
 static int run_session(const agent_ctx *ctx, const WCHAR *url, int *long_lived);
 
