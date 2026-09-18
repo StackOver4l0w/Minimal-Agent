@@ -12,7 +12,7 @@ loop that never gives up.
 
 ---
 
-## 1. The Frame Formats (v3, correlation-id)
+## 1. The Frame Formats
 
 Every command from the panel carries a correlation id; every reply
 echoes it:
@@ -23,8 +23,7 @@ reply     [status:4 LE][corrId:4 LE][body...]
 ```
 
 The panel splices `corrId` in after the opcode when it queues the
-command (its command pool is async — replies may interleave), and on
-every reply it looks the echo up among its pending commands. **A reply
+command, and on every reply it looks the echo up among its pending commands. **A reply
 with a wrong or missing echo is silently dropped** as "unmatched".
 
 That asymmetry is why the framing is not optional: an agent that
@@ -38,10 +37,11 @@ Status codes: `0` = OK, `1` = error. Exit (`0x0A`) is the only command
 with no reply — the agent terminates immediately.
 
 ```
-0x01 OpenShell      0x05 ListDirectory   0x08 GetDisplays
-0x02 WriteShell     0x06 ReadFile        0x09 GetScreenshot
-0x03 ReadShell      0x07 HashFile        0x0A Exit
+0x01 OpenShell     
+0x02 WriteShell    
+0x03 ReadShell             
 0x04 CloseShell
+0x0A Exit
 ```
 
 Implemented: the four shell commands + Exit. Everything else answers
@@ -71,15 +71,6 @@ Two wire-level subtleties baked into the handlers:
 - **ReadShell's trailing NUL is part of the contract** (the panel
   strips exactly one). Reads never block: no data means an empty-chunk
   "idle" reply, and the panel's polling drives the flow.
-
-The capability mask advertised at connect (`0100000000000000` — bit 0,
-Shell) tells the panel what to offer in its UI. It gates the UI, not
-the wire: the panel may still send anything, and unimplemented opcodes
-answer honestly with status 1 (echo included). Notably, the panel's
-file manager falls back to PowerShell-over-shell for agents that have
-Shell but not FileSystem — so this agent gets a working file browser
-with zero file opcodes implemented.
-
 ---
 
 ## 3. The Serve Loop

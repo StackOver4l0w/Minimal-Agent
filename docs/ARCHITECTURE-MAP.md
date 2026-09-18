@@ -48,10 +48,10 @@ Arrows point downward; nothing includes upward.
 ```
 entry.c ──────────────┐
 src/stack_probes.c ───┤
-src/main.c ───────────┤→ identity_headers ─→ system_facts ─┐
+src/main.c ───────────┤→ system_facts ─────────────────────┐
                       │→ transport ─→ winhttp_api ─────────┤
                       │→ shell ────────────────────────────┤→ kernel32 ─┐
-                      │→ report ───────────────────────────┤→ advapi  ──┤→ system ─┐
+                      |                                    |→ advapi  ──┤→ system ─┐
                       │→ environment ──────────────────────┼→ ntdll ─────┘         │→ peb ─┐
                       │                                     │                       └→ djb2 │
                       ▼                                     ▼                              ▼
@@ -92,13 +92,11 @@ src/
                            top-level asm can't precede entry() in .text.
   main.c                   agent_main (redial loop, backoff), run_session
                            (connect/serve), v3 corrId handlers, dispatch.
-  identity_headers.c       build_identity_headers(): X-Agent-* block from
-                           registry GUID + machine facts + compile-time arch.
   transport.c              ws_send / ws_receive (fragment assembly, truncation
                            refusal, close-frame = normal loss).
   shell.c                  256-slot cmd.exe pool: spawn/pipes/no-window,
                            non-blocking PeekNamedPipe reads, teardown.
-  report.c                 dev-only command printing; names are stack strings.
+  commands.c               shell command handlers
   system_facts.c           hostname / username / RtlGetVersion (no manifest lie).
   environment.c            GetVariable: PEB env block walk, case-insensitive.
   winhttp_api.c            LdrLoadDll(winhttp) bootstrap + 12-call table.
@@ -110,8 +108,6 @@ src/
   djb2.c                   lowercase djb2, 64-bit, seed 5381.
   string.c                 strlen/wcslen/AnsiToWide (wide conversion and
                            lengths; no formatting).
-  logfmt.c                 the printf formatter (bounded Format/FormatV) —
-                           compiled empty in release, the LOG_* engine in dev.
   memory.c                 MemoryZero/MemoryCopy + freestanding memset.
   logger.c                 LOG_INFO/LOG_ERROR printf macros → Format →
                            WriteFile(stdout); compiles to nothing in release.
