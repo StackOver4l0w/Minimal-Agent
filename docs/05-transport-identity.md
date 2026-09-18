@@ -61,13 +61,9 @@ All four handles (session, connection, request, socket) are released on
 every exit path via a `cleanup:` label — a dropped connection must not
 leak handles across redials.
 
-Note the URL contract: the agent connects to the relay **root** (`/`).
-The deployed relay generation upgrades WebSockets on `/`; a `/agent`
-suffix is a 404 and the agent would redial forever.
-
 ---
 
-## 3. The Identity Block (API 1)
+## 3. The Identity Block
 
 The agent's entire self-introduction rides the upgrade request as HTTP
 headers — there is no Hello command, no identity frame on the wire
@@ -77,10 +73,8 @@ registers the agent **only** if `X-Agent-Api-Version: 1` and a parseable
 remains invisible to the panel forever — a failure mode this project
 lived through.
 
-`build_identity_headers()` in `identity_headers.c` writes the block
-into a caller buffer (900 bytes) through a tiny checked-writer
-(`hwriter` with an `ok` flag that folds any overflow into one failure
-at the end):
+`Handle_IdentityHeaders()` in `commands.c` writes the block
+into a caller buffer (900 bytes) through a tiny checked-writer:
 
 ```
 X-Agent-Api-Version: 1                ← required; gates C2 registration
@@ -99,24 +93,6 @@ X-Agent-Build: <ID_BUILD_NUMBER>      ← CI bakes the commit count
 X-Agent-Commit: course01              ← CI bakes the short hash
 ```
 
-Sourcing details worth knowing:
-
-- **Machine UUID** is read as raw registry TEXT
-  (`HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid`) — the registry
-  already stores it in exactly `Guid.ToString()` form, which is what
-  the header must carry. (A binary-reordering variant exists for
-  binary frames; headers need the text form.)
-- **OS version** comes from `ntdll!RtlGetVersion` — the one API that
-  does not lie when the process lacks a compatibility manifest
-  (`GetVersionEx` would report a fiction).
-- **Optional headers are omitted whole** when their source fails
-  (registry blocked, service context has no username) — an empty
-  `X-Agent-Hostname:` line would be protocol garbage; no line at all
-  is legal.
-- The arch pair is compile-time: the build selects
-  `StrValArchX64/I386/Arm64`, so the CI matrix bakes each blob's true
-  architecture.
-
 Every fixed line and label is a stack-string builder
 ([04](04-stack-strings.md)); only the dynamic values (GUID, hostname…)
 are plain ASCII appended at runtime — they come from OS APIs into
@@ -124,33 +100,11 @@ buffers, never from the binary.
 
 ---
 
-## 4. A One-Flag Trap: dwHeadersLength Is CHARACTERS
+## 4. The WebSocket Pipe (transport.c)
 
-`WinHttpSendRequest`'s header-length parameter counts **characters of
-the wide string**, not bytes:
+A function, deliberately narrow:
 
-```c
-WinHttpSendRequest(request, headers_w,
-                   (DWORD)headers_len,      // characters. NOT * sizeof(WCHAR)
-                   ...);
-```
-
-Passing `headers_len * sizeof(WCHAR)` fails with
-`ERROR_INVALID_PARAMETER` (87) — the agent connected, printed nothing,
-and redialed forever until this was found. It is the kind of contract
-the docs state once and nobody remembers; it is stated here now.
-
----
-
-## 5. The WebSocket Pipe (transport.c)
-
-Two functions, deliberately narrow:
-
-**`ws_send(api, socket, data, len)`** — one binary-message frame out.
-That's it; replies always fit one frame (max 64 KB + 9, below
-WebSocket's sweet spot for fragmenting).
-
-**`ws_receive(api, socket, &msg, &closed)`** — assembles one logical
+**`WebSocketReceive(api, socket, &msg, &closed)`** — assembles one logical
 message from however many fragments WinHTTP hands over:
 
 ```c
@@ -172,14 +126,12 @@ typedef struct {
 
 ---
 
-## 6. Dev Diagnostics (report.c)
+## 6.Logging
 
-`report.c` renders incoming commands for the dev build: buffer-type and
-opcode names, payload decodes, a hexdump, the printable text. Every
-name it prints is a stack string (16 builders), because the module
-compiles into the release binary too — it is only ever *called* under
-`#ifdef LOGGING_ENABLED`. Dead code still pools literals; hence the
-discipline.
+`logger.c` provides the `LOG_INFO` and `LOG_ERROR` output.
+Release builds compile these macros away. Diagnostic output is written
+through the resolved kernel32 output API and is absent from release
+behavior.
 
 ---
 

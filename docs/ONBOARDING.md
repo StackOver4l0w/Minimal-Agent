@@ -50,10 +50,9 @@ outer protocol (main) down to the hardware facts (peb).
 entry.c ─→ agent_main (main.c)
               │
               ├─ run_session: WinHTTP connect + identity + serve loop
-              │     ├─ identity_headers.c   X-Agent-* header block
               │     ├─ transport.c          WebSocket send/receive
               │     ├─ shell.c              cmd.exe pool (OpenShell et al.)
-              │     └─ report.c             dev-only command dumps
+              │     └─ commands.c           shell command handlers
               │
               └─ supporting cast, resolved from left to right:
                     system_facts.c → advapi/ntdll/kernel32 tables
@@ -64,7 +63,7 @@ entry.c ─→ agent_main (main.c)
                     strings/mem   → string.c / memory.c / stackstrings.h
 ```
 
-Module count: **19 .c files + 21 headers, ~3.8k lines total** (a third of
+Module count: **18 .c files + 21 headers, ~3.8k lines total** (a third of
 that is `stackstrings.h` — machine-generated XOR string builders). One
 translation unit per topic; a header never pulls a module it doesn't need.
 
@@ -157,6 +156,7 @@ understand them, every oddity in the code stops being odd:
 | `src/main.c` | 396 | dial/serve/redial loop; v3 command handlers |
 | `src/transport.c` | 51 | `ws_send` / `ws_receive` (fragment assembly) |
 | `src/shell.c` | 143 | the cmd.exe pool |
+| `src/commands.c` | 150 | shell handlers |
 | `src/system_facts.c` | 57 | hostname / username / OS version |
 | `src/environment.c` | 73 | `GetVariable` — walk the PEB environment block |
 | `src/winhttp_api.c` | 88 | LdrLoadDll(winhttp.dll) + table resolve |

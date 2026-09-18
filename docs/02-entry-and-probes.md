@@ -5,8 +5,8 @@ And the function that replaces it is not allowed to share a file with
 anything else. Both rules are load-bearing — this chapter explains why.
 
 **Primary source files:**
-- `entry.c` — 34 lines, the entire file
-- `src/stack_probes.c` — 63 lines of asm, deliberately NOT in entry.c
+- `entry.c` — 35 lines, the entire file
+- `src/stack_probes.c` — 95 lines of asm, deliberately NOT in entry.c
 - `include/entry.h` — the `agent_main` contract
 
 ---
@@ -24,7 +24,7 @@ waiting for its return.
 
 ---
 
-## 2. What entry() Does (all 20 lines of it)
+## 2. What entry() Does
 
 ```c
 __attribute__((section(".text"), used))
@@ -68,9 +68,8 @@ Step by step:
    is gone from the image entirely.
 
 3. **Read the environment block through the PEB**
-   (`GetVariable`, [03](03-peb-hash-resolution.md) §5). The relay address
-   arrives as the `W_URL` environment variable of the host process —
-   argv does not exist here (no CRT parsed it), and a loader that runs
+   (`GetVariable`, [03](03-peb-hash-resolution.md)). The relay address
+   arrives as the `W_URL` environment variable of the host process, and a loader that runs
    the blob inside another process inherits that process's environment.
 
 4. **Widen and hand off** to `agent_main` (the dial/serve/redial loop,
@@ -86,7 +85,7 @@ it as unreferenced.
 ## 3. The Link-Order Contract
 
 **`entry.o` must be the FIRST object on the link line.** Not "somewhere
-in the list" — first.
+in the list" but first.
 
 The linker lays out the output `.text` in the order the objects appear.
 Whatever object comes first occupies byte 0. Since the blob has no
@@ -105,9 +104,6 @@ first, `entry.o` sixth. The resulting exe still runs (Windows jumps by
 the PE header, which points at the right address), but the `.bin` blob
 starts with `ADVAPI_Ctor`'s prologue and dies instantly when a loader
 jumps to offset 0. The failure is silent: the blob just exits.
-
-This bit a real build (documented in the README) and is why CI's gate 2
-compares the entry address against the `.text` VMA on every build.
 
 ---
 
@@ -134,21 +130,6 @@ start of the object's `.text`** — regardless of where in the file it is
 written. An `entry.c` carrying both the probes and `entry()` emits the
 probe code first; byte 0 becomes `__chkstk`, not `entry()`. The probes
 were split out precisely so `entry.c` contains nothing but `entry()`.
-
-(That ordering quirk is also why the old `.text.startup` trick — letting
-gcc's default section name sort first — never worked either: the asm
-still preceded the function inside the object.)
-
-The probe implementations are transcriptions of compiler-rt's canonical
-versions (`chkstk.S` for the SP-untouched `_ms` family, `chkstk2.S` for
-the ESP-consuming `__alloca` family on i386). Two earlier hand-rolled
-variants misread the contract — one used R10 instead of RAX on x86_64,
-one gave the i386 `__alloca` aliases the SP-untouched semantics — and
-each crashed on the first big frame. The i386 split is load-bearing:
-clang-i686 emits `movl $size,%eax; call __alloca` and then addresses
-locals at positive ESP offsets with no `sub`, so every >4 KB frame on
-i386 requires the ESP-consuming body. All three arches are live-verified
-(x86_64 natively, i386 under WOW64).
 
 ---
 

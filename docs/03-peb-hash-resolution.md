@@ -59,11 +59,8 @@ register, and the PEB is the second field of the TEB:
 | ARM32 | `r9` | +0x18 | +0x30 |
 | ARM64 | `x18` | +0x00 | +0x60 |
 
-`include/peb.h` carries minimal struct definitions (`PEB`,
-`PEB_LDR_DATA`, `LDR_DATA_TABLE_ENTRY`, …) — only the fields the walk
-reads, nothing more. They are transcribed from the (undocumented but
-stable since forever) Windows internals layout; offsets are part of the
-ABI this code targets.
+`include/peb.h` carries minimal struct definitions — only the fields the walk
+reads, nothing more.
 
 ---
 
@@ -98,8 +95,8 @@ internally:
 
 1. `base->e_magic == 'MZ'` → DOS header
 2. `base + dos->e_lfanew` → `NT` signature
-3. Optional-header magic (`0x10b` PE32 / `0x20b` PE32+) selects the
-   export-directory RVA offset (`+0x60` / `+0x70`) — both layouts are
+3. Optional-header magic selects the
+   export-directory RVA offset — both layouts are
    supported, which is what makes the same blob logic work everywhere
 4. `AddressOfNames` (an array of name RVAs) → hash each name
 5. On a match, `AddressOfNameOrdinals[i]` → `AddressOfFunctions[ord]`
@@ -108,17 +105,16 @@ internally:
    the export directory itself, it is a forwarder string ("NTDLL.RtlFoo")
    — return NULL rather than jump into a string.
 
-`ResolveExportByName` (same file) does the identical walk comparing
+`ResolveExportByName` does the identical walk comparing
 names literally — used only by the test oracle, never by the agent.
 
 `include/system.h` defines the minimal PE structs
 (`IMAGE_DOS_HEADER_MIN`, `IMAGE_EXPORT_DIRECTORY_MIN`) and the signature
-constants. "MIN" is the discipline: every field before the ones needed
-is skipped by exact byte arithmetic, no full SDK struct required.
+constants.
 
 ---
 
-## 5. The Hash (and Why It Is Exactly This One)
+## 5. The Hash and Why It Is Exactly This One
 
 `src/djb2.c` — djb2 (Daniel Bernstein's string hash) with two tweaks:
 
@@ -150,9 +146,7 @@ table-build time**:
 
 The name never appears in the binary — only its 8-byte hash, embedded
 in the code that looks it up. To resolve a new API: hash its lowercase
-name with this exact function (the local test oracle
-`.local-tests/hash_resolve_oracle.c` verifies every constant against
-the live PEB — a wrong hash resolves NULL and the oracle fails loud).
+name with this exact function.
 
 ---
 
@@ -215,14 +209,6 @@ The walk uppercases both sides during comparison (`CompareEnvName`) so
 `url=` matches `URL=` — Windows env vars are case-insensitive; the copy
 into the caller's buffer narrows UTF-16 to ASCII (relay URLs are ASCII;
 non-ASCII bytes are truncated, which is fine for this contract).
-
-`RTL_USER_PROCESS_PARAMETERS` in `include/peb.h` must stay
-naturally aligned — no explicit pad members. Natural alignment puts
-`Environment` at the OS-correct offset on every arch (0x48 on i386,
-0x80 on x86_64/aarch64); a hardcoded pad would be right on one arch and
-silently shift every field on the other. An earlier revision carried
-such a pad plus a duplicate `_EX` struct to work around it; both are
-gone.
 
 ---
 
